@@ -2,4 +2,19 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- 버튼 색상 정의 -->
+    <!-- Button color definitions -->
+
+    <!-- 반투명 흰색 배경 - 버튼의 기본 배경색으로 사용 -->
+    <!-- Semi-transparent white background - used as default button background -->
+    <color name="button_background">#80FFFFFF</color>
+
+    <!-- 선택된 버튼의 배경색 (더 진한 흰색) -->
+    <!-- Selected button background color (more opaque white) -->
+    <color name="button_background_selected">#CCFFFFFF</color>
+
+    <!-- 버튼 텍스트 색상 (진한 회색) -->
+    <!-- Button text color (dark gray) -->
+    <color name="button_text">#333333</color>
 </resources>

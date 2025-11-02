@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">FishingDiary</string>
+
+    <!-- 메인 화면 버튼 텍스트 -->
+    <!-- Main screen button texts -->
+    <string name="btn_sea_temperature">수온정보</string>
+    <string name="btn_point">포인트</string>
+    <string name="btn_start_tracking">추적시작</string>
+    <string name="btn_apple_map">Apple Map</string>
+    <string name="btn_kakao_map">Kakao Map</string>
 </resources>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 선택된 버튼의 배경 drawable 정의 -->
+<!-- Selected button background drawable definition -->
+
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+
+    <!-- 기본 버튼과 동일한 둥근 모서리 -->
+    <!-- Same rounded corners as default button -->
+    <corners android:radius="8dp" />
+
+    <!-- 더 진한 흰색 배경으로 선택 상태를 표시 -->
+    <!-- More opaque white background to indicate selected state -->
+    <solid android:color="@color/button_background_selected" />
+
+    <!-- 더 두꺼운 흰색 테두리로 선택 상태를 강조 -->
+    <!-- Thicker white border to emphasize selected state -->
+    <stroke
+        android:width="2dp"
+        android:color="@color/white" />
+
+</shape>

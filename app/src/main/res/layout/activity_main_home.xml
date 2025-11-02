@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    메인 홈 화면 레이아웃
+    Main home screen layout
+
+    ConstraintLayout: Android에서 복잡한 레이아웃을 유연하게 배치할 수 있는 레이아웃
+    - 각 뷰의 위치를 다른 뷰나 부모 컨테이너에 대한 제약(constraint)으로 정의
+    - iOS의 Auto Layout과 유사한 개념
+-->
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/sunset_background"
+    tools:context=".presentation.main.MainHomeActivity">
+
+    <!--
+        하단 버튼 컨테이너
+        Bottom button container
+
+        LinearLayout: 자식 뷰들을 선형으로 배치하는 레이아웃
+        - orientation="vertical": 세로 방향으로 배치
+        - iOS의 VStack과 유사한 개념
+    -->
+    <LinearLayout
+        android:id="@+id/bottomButtonContainer"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <!--
+            기능 버튼 컨테이너 (수온정보, 포인트, 추적시작)
+            Function button container (Sea Temperature, Point, Start Tracking)
+
+            orientation="horizontal": 가로 방향으로 배치 (iOS의 HStack과 유사)
+        -->
+        <LinearLayout
+            android:id="@+id/functionButtonsLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <!--
+                수온정보 버튼
+                Sea Temperature Information Button
+
+                주요 속성 설명:
+                - android:id: 코틀린 코드에서 이 버튼을 참조할 때 사용하는 ID
+                - android:layout_width="0dp": 가중치(weight)를 사용하여 너비 결정
+                - android:layout_weight="1": 형제 뷰들과 공간을 균등하게 분배
+                - android:layout_height="48dp": 버튼 높이 (dp = density-independent pixels, 화면 밀도에 관계없이 일정한 크기)
+                - android:layout_margin: 버튼 주변 여백
+                - android:background: 버튼 배경 drawable 설정
+                - android:text: 버튼에 표시할 텍스트 (strings.xml에서 가져옴)
+                - android:textColor: 텍스트 색상
+                - android:textSize: 텍스트 크기 (sp = scale-independent pixels, 사용자 폰트 설정 반영)
+                - android:textStyle="bold": 텍스트를 굵게 표시
+            -->
+            <Button
+                android:id="@+id/btnSeaTemperature"
+                android:layout_width="match_parent"
+                android:layout_weight="1"
+                android:layout_height="48dp"
+                android:layout_margin="4dp"
+                android:background="@drawable/button_background"
+                android:text="@string/btn_sea_temperature"
+                android:textColor="@color/button_text"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <!--
+                포인트 버튼
+                Point Button
+
+                낚시 포인트를 기록하고 조회하는 기능
+            -->
+            <Button
+                android:id="@+id/btnPoint"
+                android:layout_width="match_parent"
+                android:layout_weight="1"
+                android:layout_height="48dp"
+                android:layout_margin="4dp"
+                android:background="@drawable/button_background"
+                android:text="@string/btn_point"
+                android:textColor="@color/button_text"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <!--
+                추적시작 버튼
+                Start Tracking Button
+
+                GPS 기반 낚시 이동 경로 추적 시작
+            -->
+            <Button
+                android:id="@+id/btnStartTracking"
+                android:layout_width="match_parent"
+                android:layout_weight="1"
+                android:layout_height="48dp"
+                android:layout_margin="4dp"
+                android:background="@drawable/button_background"
+                android:text="@string/btn_start_tracking"
+                android:textColor="@color/button_text"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+        <!--
+            지도 선택 버튼 컨테이너 (Apple Map, Kakao Map)
+            Map selection button container
+
+            사용자가 원하는 지도 제공자를 선택할 수 있는 토글 버튼
+        -->
+        <LinearLayout
+            android:id="@+id/mapSelectionLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <!--
+                Apple Map 버튼
+                Apple Map Button
+
+                android:tag: 버튼의 상태를 저장하기 위한 태그
+                - "unselected": 선택되지 않은 상태
+                - "selected": 선택된 상태 (코틀린 코드에서 변경)
+            -->
+            <Button
+                android:id="@+id/btnAppleMap"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="48dp"
+                android:layout_margin="4dp"
+                android:background="@drawable/button_background_selected"
+                android:text="@string/btn_apple_map"
+                android:textColor="@color/button_text"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:tag="selected" />
+
+            <!--
+                Kakao Map 버튼
+                Kakao Map Button
+
+                초기 상태는 선택되지 않음 (button_background 사용)
+            -->
+            <Button
+                android:id="@+id/btnKakaoMap"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="48dp"
+                android:layout_margin="4dp"
+                android:background="@drawable/button_background"
+                android:text="@string/btn_kakao_map"
+                android:textColor="@color/button_text"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:tag="unselected" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

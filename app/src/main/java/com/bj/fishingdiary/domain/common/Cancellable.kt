@@ -17,9 +17,21 @@ package com.bj.fishingdiary.domain.common
  * // 나중에 작업을 취소하고 싶을 때
  * // When you want to cancel the operation later
  * task?.cancel()
+ *
+ * // 취소 상태 확인
+ * // Check if cancelled
+ * if (task?.isCancelled == true) {
+ *     // 작업이 취소됨
+ * }
  * ```
  */
 interface Cancellable {
+    /**
+     * 작업이 취소되었는지 여부
+     * Whether the operation has been cancelled
+     */
+    val isCancelled: Boolean
+
     /**
      * 진행 중인 작업을 취소합니다
      * Cancels the ongoing operation

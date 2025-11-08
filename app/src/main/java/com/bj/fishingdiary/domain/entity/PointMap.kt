@@ -1,5 +1,8 @@
 package com.bj.fishingdiary.domain.entity
 
+import android.location.Location
+import com.google.gson.annotations.SerializedName
+
 /**
  * 낚시 포인트 지도 관련 Entity
  * Fishing Point Map Related Entities
@@ -34,20 +37,46 @@ enum class MapType {
  * GPS로 추적한 낚시 위치 정보를 저장하는 모델
  * Model that stores fishing location information tracked by GPS
  *
- * @property time 기록 시간 (예: "2024-01-15 14:30:00")
- * @property latitude 위도 (Latitude) - 문자열 형식
- * @property longitude 경도 (Longitude) - 문자열 형식
- * @property kmh 속도 (km/h)
- * @property knot 속도 (knot, 해양에서 사용하는 속도 단위)
- * @property sequence 순서 번호 (여러 포인트를 기록할 때 순서 구분)
+ * iOS의 LocationData struct에 대응
+ * 위치 정보를 저장하기 위한 직렬화 가능한 데이터 클래스
+ *
+ * @property time 기록 시간 (ISO 8601 format)
+ * @property latitude 위도 (소수점 6자리)
+ * @property longitude 경도 (소수점 6자리)
+ * @property kmh 속도 (km/h, 소수점 2자리)
+ * @property knot 속도 (knot, 소수점 2자리)
+ * @property sequence 시퀀스 번호
  */
 data class LocationData(
+    @SerializedName("time")
     val time: String,
+
+    @SerializedName("latitude")
     val latitude: String,
+
+    @SerializedName("longitude")
     val longitude: String,
+
+    @SerializedName("kmh")
     val kmh: String,
+
+    @SerializedName("knot")
     val knot: String,
+
+    @SerializedName("sequence")
     val sequence: Int
+)
+
+/**
+ * 위치 정보 (데이터 + Android Location 객체)
+ * Location Information
+ *
+ * iOS의 LocationInfo struct에 대응
+ * LocationData와 Android Location 객체를 함께 보관
+ */
+data class LocationInfo(
+    val locationData: LocationData,     // 저장용 위치 데이터
+    val locationInfo: Location          // Android Location 객체
 )
 
 /**
@@ -123,20 +152,16 @@ data class MapPin(
 )
 
 /**
- * 지도 라인 정보 (경로 표시용)
- * Map Line Information (for path display)
+ * 지도 라인 정보 (이전 위치 → 현재 위치)
+ * Map Line Information
  *
- * 두 지점을 연결하는 선을 그리기 위한 정보
- * Information to draw a line connecting two points
+ * iOS의 MapLineInfo struct에 대응
+ * Combine의 CurrentValueSubject로 전달되는 실시간 위치 라인 정보
  *
- * @property previousLatitude 이전 위치 위도
- * @property previousLongitude 이전 위치 경도
- * @property currentLatitude 현재 위치 위도
- * @property currentLongitude 현재 위치 경도
+ * @property previousLocation 이전 위치
+ * @property currentLocation 현재 위치
  */
 data class MapLineInfo(
-    val previousLatitude: Double,
-    val previousLongitude: Double,
-    val currentLatitude: Double,
-    val currentLongitude: Double
+    val previousLocation: Location,     // 이전 위치
+    val currentLocation: Location       // 현재 위치
 )

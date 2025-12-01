@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    수온 정보 아이템 레이아웃
+    Temperature Information Item Layout
+
+    iOS의 TempuratureCell.swift에 대응
+    RecyclerView의 각 행을 표시하는 레이아웃
+
+    구성:
+    - oceanName: 관측소 이름
+    - surTemperature: 표층 수온
+    - midTemperature: 중층 수온
+    - botTemperature: 저층 수온
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="8dp"
+    android:background="?android:attr/selectableItemBackground">
+
+    <!--
+        측정해역 (관측소 이름)
+        Ocean Name (Station Name)
+
+        layout_weight="2": 다른 항목보다 2배 넓게 표시
+    -->
+    <TextView
+        android:id="@+id/tvOceanName"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="2"
+        android:text="관측소"
+        android:textSize="14sp"
+        android:textColor="@color/text_primary"
+        android:gravity="start|center_vertical"
+        android:paddingStart="8dp"
+        android:paddingEnd="4dp" />
+
+    <!--
+        표층 수온
+        Surface Temperature
+
+        layout_weight="1": 균등한 너비
+    -->
+    <TextView
+        android:id="@+id/tvSurTemperature"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="0.0"
+        android:textSize="14sp"
+        android:textColor="@color/text_primary"
+        android:gravity="center"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp" />
+
+    <!--
+        중층 수온
+        Middle Temperature
+    -->
+    <TextView
+        android:id="@+id/tvMidTemperature"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="0.0"
+        android:textSize="14sp"
+        android:textColor="@color/text_primary"
+        android:gravity="center"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp" />
+
+    <!--
+        저층 수온
+        Bottom Temperature
+    -->
+    <TextView
+        android:id="@+id/tvBotTemperature"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="0.0"
+        android:textSize="14sp"
+        android:textColor="@color/text_primary"
+        android:gravity="center"
+        android:paddingStart="4dp"
+        android:paddingEnd="8dp" />
+
+</LinearLayout>

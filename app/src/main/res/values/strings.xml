@@ -8,4 +8,5 @@
     <string name="btn_start_tracking">추적시작</string>
     <string name="btn_apple_map">Apple Map</string>
     <string name="btn_kakao_map">Kakao Map</string>
+    <string name="btn_ocean_favorites">수온 즐겨찾기</string>
 </resources>

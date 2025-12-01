@@ -17,4 +17,8 @@
     <!-- 버튼 텍스트 색상 (진한 회색) -->
     <!-- Button text color (dark gray) -->
     <color name="button_text">#333333</color>
+
+    <!-- 기본 텍스트 색상 -->
+    <!-- Default text color -->
+    <color name="text_primary">#FFFFFF</color>
 </resources>

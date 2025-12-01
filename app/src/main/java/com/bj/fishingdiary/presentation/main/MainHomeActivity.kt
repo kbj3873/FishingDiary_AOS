@@ -4,7 +4,14 @@ import android.os.Bundle
 import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.bj.fishingdiary.R
+import com.bj.fishingdiary.application.di.DataServiceDIContainer
+import com.bj.fishingdiary.domain.entity.MapType
+import kotlinx.coroutines.launch
 
 /**
  * 메인 홈 화면 Activity
@@ -14,6 +21,13 @@ import com.bj.fishingdiary.R
  * - Android에서 화면 하나를 나타내는 기본 단위
  * - iOS의 UIViewController 또는 SwiftUI의 View와 유사한 개념
  * - AppCompatActivity를 상속받아 하위 버전 Android와의 호환성 제공
+ *
+ * 주요 기능:
+ * - 수온 정보 리스트 표시
+ * - Pull to Refresh (아래로 당겨서 새로고침)
+ * - 수온 즐겨찾기 버튼
+ * - 지도 선택 (Apple Map / Kakao Map)
+ * - 기능 버튼 (수온정보, 포인트, 추적시작)
  */
 class MainHomeActivity : AppCompatActivity() {
 
@@ -27,6 +41,12 @@ class MainHomeActivity : AppCompatActivity() {
      *
      * private: 이 클래스 내부에서만 접근 가능 (캡슐화)
      */
+
+    // 수온 정보 리스트 관련 뷰
+    // Temperature information list related views
+    private lateinit var swipeRefreshLayout: SwipeRefreshLayout  // Pull to Refresh
+    private lateinit var recyclerViewTemperature: RecyclerView   // 수온 리스트
+    private lateinit var btnOceanFavorites: Button               // 즐겨찾기 버튼
 
     // 기능 버튼들
     // Function buttons
@@ -42,11 +62,27 @@ class MainHomeActivity : AppCompatActivity() {
     /**
      * 현재 선택된 지도 타입을 저장하는 변수
      * Variable to store currently selected map type
-     *
-     * enum class: 정해진 값들만 가질 수 있는 타입
-     * - iOS의 enum과 동일한 개념
      */
     private var selectedMapType: MapType = MapType.APPLE_MAP
+
+    // ===== ViewModel 및 Adapter =====
+    // ViewModel and Adapter
+
+    /**
+     * MainViewModel 인스턴스
+     * - 수온 정보 데이터 관리
+     * - API 호출 및 상태 관리
+     */
+    private lateinit var viewModel: MainViewModel
+
+    /**
+     * RecyclerView Adapter 인스턴스
+     * - 수온 정보 리스트 표시
+     */
+    private val temperatureAdapter = TemperatureAdapter()
+
+    // ===== Activity 생명주기 메서드 =====
+    // Activity Lifecycle Methods
 
     /**
      * onCreate: Activity가 생성될 때 호출되는 생명주기 메서드
@@ -67,35 +103,93 @@ class MainHomeActivity : AppCompatActivity() {
          */
         setContentView(R.layout.activity_main_home)
 
-        // 뷰 초기화 (XML에서 정의한 버튼들을 코틀린 변수와 연결)
-        // Initialize views (connect buttons defined in XML with Kotlin variables)
+        // DIContainer를 사용하여 ViewModel 생성
+        // Create ViewModel using DIContainer
+        val dataServiceDIContainer = DataServiceDIContainer()
+        val mainSceneDIContainer = dataServiceDIContainer.makeMainSceneDIContainer()
+        viewModel = mainSceneDIContainer.makeMainViewModel(applicationContext)
+
+        // 뷰 초기화 (XML에서 정의한 뷰들을 코틀린 변수와 연결)
+        // Initialize views (connect views defined in XML with Kotlin variables)
         initializeViews()
 
-        // 버튼 클릭 리스너 설정 (버튼 클릭 시 동작 정의)
-        // Set up button click listeners (define actions when buttons are clicked)
+        // RecyclerView 설정
+        // Set up RecyclerView
+        setupRecyclerView()
+
+        // Pull to Refresh 설정
+        // Set up Pull to Refresh
+        setupSwipeRefresh()
+
+        // 버튼 클릭 리스너 설정
+        // Set up button click listeners
         setupClickListeners()
+
+        // ViewModel 상태 구독
+        // Subscribe to ViewModel states
+        observeViewModel()
+
+        // 초기 데이터 로드
+        // Load initial data
+        viewModel.viewDidLoad()
     }
+
+    // ===== 초기화 메서드 =====
+    // Initialization Methods
 
     /**
      * XML 레이아웃에서 정의한 뷰들을 코틀린 변수와 연결하는 메서드
      * Method to connect views defined in XML layout with Kotlin variables
-     *
-     * findViewById<타입>(R.id.뷰ID):
-     * - XML에서 android:id로 지정한 ID를 사용하여 뷰를 찾음
-     * - <타입>: 제네릭 타입 지정 (여기서는 Button)
-     * - iOS의 @IBOutlet과 유사한 개념
      */
     private fun initializeViews() {
+        // 수온 정보 리스트 관련 뷰
+        swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout)
+        recyclerViewTemperature = findViewById(R.id.recyclerViewTemperature)
+        btnOceanFavorites = findViewById(R.id.btnOceanFavorites)
+
         // 기능 버튼 초기화
-        // Initialize function buttons
         btnSeaTemperature = findViewById(R.id.btnSeaTemperature)
         btnPoint = findViewById(R.id.btnPoint)
         btnStartTracking = findViewById(R.id.btnStartTracking)
 
         // 지도 선택 버튼 초기화
-        // Initialize map selection buttons
         btnAppleMap = findViewById(R.id.btnAppleMap)
         btnKakaoMap = findViewById(R.id.btnKakaoMap)
+    }
+
+    /**
+     * RecyclerView 설정
+     * Set up RecyclerView
+     *
+     * RecyclerView란?
+     * - 스크롤 가능한 리스트를 효율적으로 표시하는 뷰
+     * - iOS의 UITableView와 유사
+     */
+    private fun setupRecyclerView() {
+        recyclerViewTemperature.apply {
+            // Adapter 설정
+            adapter = temperatureAdapter
+
+            // LayoutManager 설정
+            // LinearLayoutManager: 세로 방향 리스트 (iOS UITableView와 유사)
+            layoutManager = LinearLayoutManager(this@MainHomeActivity)
+
+            // 아이템 크기가 고정되어 있으면 true로 설정하여 성능 향상
+            setHasFixedSize(true)
+        }
+    }
+
+    /**
+     * Pull to Refresh 설정
+     * Set up Pull to Refresh (Swipe to Refresh)
+     *
+     * iOS의 UIRefreshControl과 동일한 기능
+     */
+    private fun setupSwipeRefresh() {
+        swipeRefreshLayout.setOnRefreshListener {
+            // 사용자가 아래로 당겨서 새로고침할 때 호출
+            viewModel.fetchRisaList()
+        }
     }
 
     /**
@@ -104,76 +198,47 @@ class MainHomeActivity : AppCompatActivity() {
      */
     private fun setupClickListeners() {
 
+        // ===== 수온 즐겨찾기 버튼 =====
+        // Ocean Favorites Button
+        btnOceanFavorites.setOnClickListener {
+            // TODO: 즐겨찾기 관리 화면으로 이동
+            showToast("수온 즐겨찾기 화면으로 이동합니다")
+        }
+
         // ===== 기능 버튼 클릭 리스너 설정 =====
         // Set up function button click listeners
 
-        /**
-         * setOnClickListener: 버튼이 클릭됐을 때 실행할 코드를 설정
-         * - { }: 람다 표현식 (익명 함수를 간단하게 표현)
-         * - iOS의 클로저(closure)와 동일한 개념
-         */
-
         // 수온정보 버튼 클릭 시
-        // When Sea Temperature button is clicked
         btnSeaTemperature.setOnClickListener {
-            // 아직 기능이 구현되지 않았으므로 Toast 메시지로 알림
-            // Show Toast message as the feature is not implemented yet
             showToast("수온정보 화면으로 이동합니다")
-
-            // TODO: 나중에 수온정보 화면으로 이동하는 코드 추가
-            // TODO: Add code to navigate to Sea Temperature screen later
-            // 예시: startActivity(Intent(this, SeaTemperatureActivity::class.java))
+            // TODO: 수온정보 화면으로 이동
         }
 
         // 포인트 버튼 클릭 시
-        // When Point button is clicked
         btnPoint.setOnClickListener {
             showToast("포인트 화면으로 이동합니다")
-
             // TODO: 포인트 목록 화면으로 이동
-            // TODO: Navigate to Point list screen
         }
 
         // 추적시작 버튼 클릭 시
-        // When Start Tracking button is clicked
         btnStartTracking.setOnClickListener {
             showToast("추적을 시작합니다")
-
             // TODO: GPS 추적 시작 및 트랙 맵 화면으로 이동
-            // TODO: Start GPS tracking and navigate to Track Map screen
         }
 
         // ===== 지도 선택 버튼 클릭 리스너 설정 =====
         // Set up map selection button click listeners
 
-        /**
-         * 지도 타입을 변경하고 버튼 스타일을 업데이트
-         * Change map type and update button styles
-         *
-         * 토글 방식: 하나를 선택하면 다른 하나는 자동으로 선택 해제
-         * Toggle method: Selecting one automatically deselects the other
-         */
-
         // Apple Map 버튼 클릭 시
-        // When Apple Map button is clicked
         btnAppleMap.setOnClickListener {
-            // 이미 선택된 상태가 아닐 때만 동작
-            // Only works if not already selected
             if (selectedMapType != MapType.APPLE_MAP) {
-                // 선택된 지도 타입을 Apple Map으로 변경
-                // Change selected map type to Apple Map
                 selectedMapType = MapType.APPLE_MAP
-
-                // 버튼 스타일 업데이트 (선택/비선택 상태 표시)
-                // Update button styles (show selected/unselected state)
                 updateMapButtonStyles()
-
                 showToast("Apple Map이 선택되었습니다")
             }
         }
 
         // Kakao Map 버튼 클릭 시
-        // When Kakao Map button is clicked
         btnKakaoMap.setOnClickListener {
             if (selectedMapType != MapType.KAKAO_MAP) {
                 selectedMapType = MapType.KAKAO_MAP
@@ -184,44 +249,58 @@ class MainHomeActivity : AppCompatActivity() {
     }
 
     /**
+     * ViewModel의 상태를 구독하는 메서드
+     * Method to observe ViewModel states
+     *
+     * StateFlow 구독:
+     * - lifecycleScope: Activity 생명주기에 맞춰 자동으로 구독 시작/종료
+     * - iOS의 Combine sink와 유사한 개념
+     */
+    private fun observeViewModel() {
+        // 수온 정보 리스트 구독
+        lifecycleScope.launch {
+            viewModel.oceanStations.collect { stations ->
+                // 데이터가 변경될 때마다 호출
+                temperatureAdapter.submitList(stations)
+            }
+        }
+
+        // 로딩 상태 구독
+        lifecycleScope.launch {
+            viewModel.isLoading.collect { isLoading ->
+                // 로딩 상태에 따라 SwipeRefreshLayout 업데이트
+                swipeRefreshLayout.isRefreshing = isLoading
+            }
+        }
+
+        // 에러 메시지 구독
+        lifecycleScope.launch {
+            viewModel.errorMessage.collect { errorMessage ->
+                errorMessage?.let {
+                    showToast("에러: $it")
+                }
+            }
+        }
+    }
+
+    // ===== UI 업데이트 메서드 =====
+    // UI Update Methods
+
+    /**
      * 지도 선택 버튼의 스타일을 업데이트하는 메서드
      * Method to update map selection button styles
-     *
-     * 선택된 버튼: 진한 배경, 선택되지 않은 버튼: 연한 배경
-     * Selected button: darker background, Unselected button: lighter background
      */
     private fun updateMapButtonStyles() {
-        /**
-         * when: 코틀린의 조건문 (Java의 switch문과 유사)
-         * - iOS Swift의 switch문과 동일한 개념
-         * - selectedMapType의 값에 따라 다른 동작 수행
-         */
         when (selectedMapType) {
             MapType.APPLE_MAP -> {
-                // Apple Map이 선택된 경우
-                // When Apple Map is selected
-
-                /**
-                 * setBackgroundResource: 뷰의 배경 리소스를 설정
-                 * - R.drawable.button_background_selected: 선택된 버튼 배경
-                 * - R.drawable.button_background: 기본 버튼 배경
-                 */
                 btnAppleMap.setBackgroundResource(R.drawable.button_background_selected)
                 btnKakaoMap.setBackgroundResource(R.drawable.button_background)
-
-                /**
-                 * tag: 뷰에 추가 정보를 저장할 수 있는 속성
-                 * - 나중에 버튼의 상태를 확인할 때 사용 가능
-                 */
                 btnAppleMap.tag = "selected"
                 btnKakaoMap.tag = "unselected"
             }
             MapType.KAKAO_MAP -> {
-                // Kakao Map이 선택된 경우
-                // When Kakao Map is selected
                 btnAppleMap.setBackgroundResource(R.drawable.button_background)
                 btnKakaoMap.setBackgroundResource(R.drawable.button_background_selected)
-
                 btnAppleMap.tag = "unselected"
                 btnKakaoMap.tag = "selected"
             }
@@ -231,36 +310,23 @@ class MainHomeActivity : AppCompatActivity() {
     /**
      * Toast 메시지를 표시하는 헬퍼 메서드
      * Helper method to display Toast messages
-     *
-     * Toast: 화면 하단에 잠깐 나타났다 사라지는 메시지
-     * - iOS의 Alert이나 Notification과 비슷한 개념
-     * - 사용자에게 간단한 피드백을 제공할 때 사용
-     *
-     * @param message: 표시할 메시지 문자열
      */
     private fun showToast(message: String) {
-        /**
-         * Toast.makeText(): Toast 객체를 생성
-         * - this: 현재 Activity의 Context (Android에서 앱 환경 정보를 담는 객체)
-         * - message: 표시할 메시지
-         * - Toast.LENGTH_SHORT: 짧은 시간 동안 표시 (약 2초)
-         *   Toast.LENGTH_LONG은 긴 시간 (약 3.5초)
-         *
-         * .show(): Toast를 실제로 화면에 표시
-         */
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
+    // ===== Activity 생명주기 정리 =====
+    // Activity Lifecycle Cleanup
+
     /**
-     * 지도 타입을 나타내는 열거형 (Enum)
-     * Enumeration representing map types
+     * onDestroy: Activity가 제거될 때 호출
+     * Called when Activity is destroyed
      *
-     * enum class: 정해진 값들만 가질 수 있는 타입
-     * - 타입 안정성을 제공 (잘못된 값이 들어가는 것을 방지)
-     * - iOS Swift의 enum과 동일한 개념
+     * 리소스 정리 및 작업 취소
      */
-    enum class MapType {
-        APPLE_MAP,   // Apple 지도
-        KAKAO_MAP    // Kakao 지도
+    override fun onDestroy() {
+        super.onDestroy()
+        // ViewModel 정리
+        viewModel.onCleared()
     }
 }

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -17,6 +19,17 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // local.properties에서 API 키 읽어오기
+        val localProperties = Properties()
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            localPropertiesFile.inputStream().use { localProperties.load(it) }
+        }
+
+        // BuildConfig에 API 키 추가
+        buildConfigField("String", "RISA_API_KEY", "\"${localProperties.getProperty("RISA_API_KEY", "")}\"")
+        buildConfigField("String", "API_BASE_URL", "\"${localProperties.getProperty("API_BASE_URL", "")}\"")
     }
 
     buildTypes {
@@ -47,6 +60,10 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
+
+    // UI Components
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
 
     // JSON serialization/deserialization
     implementation("com.google.code.gson:gson:2.10.1")

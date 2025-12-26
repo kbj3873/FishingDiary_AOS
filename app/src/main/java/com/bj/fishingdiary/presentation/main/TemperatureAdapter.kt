@@ -1,5 +1,6 @@
 package com.bj.fishingdiary.presentation.main
 
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -103,6 +104,7 @@ class TemperatureAdapter : ListAdapter<OceanStationModel, TemperatureAdapter.Tem
             tvSurTemperature.text = station.surTemperature
             tvMidTemperature.text = station.midTemperature
             tvBotTemperature.text = station.botTemperature
+            Log.d("D", station.stationName + " " + station.surTemperature + " " + station.midTemperature + " "  + station.botTemperature)
         }
     }
 

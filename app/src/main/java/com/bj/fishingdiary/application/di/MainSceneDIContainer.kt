@@ -42,6 +42,18 @@ class MainSceneDIContainer(
         )
     }
 
+    /**
+     * OceanSelectViewModel 생성
+     * Create OceanSelectViewModel
+     */
+    fun makeOceanSelectViewModel(context: Context): com.bj.fishingdiary.presentation.main.OceanSelectViewModel {
+        return com.bj.fishingdiary.presentation.main.OceanSelectViewModel(
+            context = context,
+            appConfiguration = dependencies.appConfiguration,
+            oceanUseCase = makeOceanUseCase()
+        )
+    }
+
     // ==================== UseCase 생성 ====================
 
     /**

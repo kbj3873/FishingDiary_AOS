@@ -65,6 +65,14 @@ class MainHomeActivity : AppCompatActivity() {
      */
     private var selectedMapType: MapType = MapType.APPLE_MAP
 
+    /**
+     * 최초 로드 여부를 저장하는 변수
+     * Variable to track if this is the first load
+     *
+     * onCreate에서 최초 로드하므로, onResume에서 중복 로드를 방지
+     */
+    private var isFirstLoad: Boolean = true
+
     // ===== ViewModel 및 Adapter =====
     // ViewModel and Adapter
 
@@ -134,6 +142,23 @@ class MainHomeActivity : AppCompatActivity() {
         viewModel.viewDidLoad()
     }
 
+    /**
+     * Activity가 다시 활성화될 때 호출
+     * Called when Activity resumes
+     *
+     * OceanSelectActivity에서 즐겨찾기를 변경하고 돌아왔을 때
+     * 변경된 즐겨찾기 목록을 반영하기 위해 데이터를 다시 로드
+     */
+    override fun onResume() {
+        super.onResume()
+        // onCreate에서 이미 로드했다면, 재로드 시에만 데이터 갱신
+        // onCreate에서 최초 로드되므로, 이후 onResume에서는 갱신만 수행
+        if (!isFirstLoad) {
+            viewModel.fetchRisaList()
+        }
+        isFirstLoad = false
+    }
+
     // ===== 초기화 메서드 =====
     // Initialization Methods
 
@@ -201,8 +226,9 @@ class MainHomeActivity : AppCompatActivity() {
         // ===== 수온 즐겨찾기 버튼 =====
         // Ocean Favorites Button
         btnOceanFavorites.setOnClickListener {
-            // TODO: 즐겨찾기 관리 화면으로 이동
-            showToast("수온 즐겨찾기 화면으로 이동합니다")
+            // 즐겨찾기 관리 화면으로 이동
+            val intent = android.content.Intent(this, OceanSelectActivity::class.java)
+            startActivity(intent)
         }
 
         // ===== 기능 버튼 클릭 리스너 설정 =====

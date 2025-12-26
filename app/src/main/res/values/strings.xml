@@ -9,4 +9,10 @@
     <string name="btn_apple_map">Apple Map</string>
     <string name="btn_kakao_map">Kakao Map</string>
     <string name="btn_ocean_favorites">수온 즐겨찾기</string>
+
+    <!-- 수온 즐겨찾기 화면 -->
+    <!-- Ocean favorites screen -->
+    <string name="title_ocean_select">수온 즐겨찾기</string>
+    <string name="btn_close">닫기</string>
+    <string name="content_description_checkbox">선택 체크박스</string>
 </resources>

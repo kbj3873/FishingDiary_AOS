@@ -54,6 +54,17 @@ class MainSceneDIContainer(
         )
     }
 
+    /**
+     * SeaWaterTemperatureViewModel 생성
+     * Create SeaWaterTemperatureViewModel
+     */
+    fun makeSeaWaterTemperatureViewModel(): com.bj.fishingdiary.presentation.seawatertemperature.SeaWaterTemperatureViewModel {
+        return com.bj.fishingdiary.presentation.seawatertemperature.SeaWaterTemperatureViewModel(
+            appConfiguration = dependencies.appConfiguration,
+            oceanUseCase = makeOceanUseCase()
+        )
+    }
+
     // ==================== UseCase 생성 ====================
 
     /**

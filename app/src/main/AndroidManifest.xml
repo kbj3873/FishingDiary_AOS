@@ -44,6 +44,11 @@
             android:name=".presentation.main.OceanSelectActivity"
             android:exported="false" />
 
+        <!-- Sea Water Temperature Activity -->
+        <activity
+            android:name=".presentation.seawatertemperature.SeaWaterTemperatureActivity"
+            android:exported="false" />
+
         <!-- Location Tracking Foreground Service -->
         <service
             android:name=".services.LocationTrackingService"

@@ -156,7 +156,7 @@ data class Ocean(
     val botDep: Float,
     val lon: Float,
     val lat: Float,
-    val dateT: Int
+    val dateT: Long
 )
 
 /**

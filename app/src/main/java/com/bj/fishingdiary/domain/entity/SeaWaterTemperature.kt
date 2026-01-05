@@ -59,5 +59,5 @@ data class SeaWaterTemperatureSet(
     val surDep: Float,
     val midDep: Float,
     val botDep: Float,
-    val dateTime: Int          // Int: 정수 타입, Unix 타임스탬프
+    val dateTime: Long         // Long: 정수 타입, Unix 타임스탬프 (yyyyMMddHHmm)
 )

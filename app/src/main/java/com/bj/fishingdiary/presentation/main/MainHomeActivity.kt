@@ -236,8 +236,8 @@ class MainHomeActivity : AppCompatActivity() {
 
         // 수온정보 버튼 클릭 시
         btnSeaTemperature.setOnClickListener {
-            showToast("수온정보 화면으로 이동합니다")
-            // TODO: 수온정보 화면으로 이동
+            val intent = android.content.Intent(this, com.bj.fishingdiary.presentation.seawatertemperature.SeaWaterTemperatureActivity::class.java)
+            startActivity(intent)
         }
 
         // 포인트 버튼 클릭 시

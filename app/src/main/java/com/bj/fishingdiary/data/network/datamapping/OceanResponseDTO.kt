@@ -243,6 +243,10 @@ data class OceanResponseDTO(
      * Ocean DTO
      *
      * iOS의 OceanDTO에 대응
+     *
+     * 주의: 서버에서 값이 없을 때 빈 문자열("")로 응답하는 경우가 있음
+     * 예: "WTR_TEMP_S":15.1 (값 있음) vs "MID_DEP":"" (값 없음)
+     * 따라서 온도/깊이 필드를 String으로 받아서 toDomain()에서 변환
      */
     data class OceanDTO(
         @SerializedName("STA_CDE")
@@ -258,22 +262,22 @@ data class OceanResponseDTO(
         val obsDtm: String?,
 
         @SerializedName("WTR_TEMP_S")
-        val wtrTempS: Float?,
+        val wtrTempS: String?,
 
         @SerializedName("SUR_DEP")
-        val surDep: Float?,
+        val surDep: String?,
 
         @SerializedName("WTR_TEMP_M")
-        val wtrTempM: Float?,
+        val wtrTempM: String?,
 
         @SerializedName("MID_DEP")
-        val midDep: Float?,
+        val midDep: String?,
 
         @SerializedName("WTR_TEMP_B")
-        val wtrTempB: Float?,
+        val wtrTempB: String?,
 
         @SerializedName("BOT_DEP")
-        val botDep: Float?,
+        val botDep: String?,
 
         @SerializedName("LON")
         val lon: Float?,
@@ -285,13 +289,30 @@ data class OceanResponseDTO(
          * 날짜 정수 값 계산
          * Calculate date integer value
          *
-         * iOS와 동일한 로직: obsDtm에서 숫자만 추출하여 Int로 변환
+         * iOS와 동일한 로직: obsDtm에서 숫자만 추출하여 Long으로 변환
+         * "2025-12-20 00:00" -> "202512200000" (Long)
+         *
+         * Int 대신 Long을 사용하는 이유:
+         * - Int 최대값: 2,147,483,647
+         * - "202512200000"은 Int 범위를 초과
+         * - Swift의 Int는 64비트이지만 Kotlin의 Int는 32비트
          */
-        val dateT: Int
+        val dateT: Long
             get() {
                 val str = obsDtm?.filter { it.isDigit() } ?: ""
-                return str.toIntOrNull() ?: -1
+                return str.toLongOrNull() ?: -1L
             }
+
+        /**
+         * String을 Float로 안전하게 변환
+         * Safely convert String to Float
+         *
+         * @param value String 값 (null 또는 빈 문자열 가능)
+         * @return Float 값 (변환 실패 시 -99f)
+         */
+        private fun String?.toFloatOrDefault(): Float {
+            return this?.toFloatOrNull() ?: -99f
+        }
 
         fun toDomain(): Ocean {
             return Ocean(
@@ -299,12 +320,12 @@ data class OceanResponseDTO(
                 staNamKor = staNamKor ?: "",
                 staNam = staNam ?: "",
                 obsDtm = obsDtm ?: "",
-                wtrTempS = wtrTempS ?: -99f,
-                surDep = surDep ?: -99f,
-                wtrTempM = wtrTempM ?: -99f,
-                midDep = midDep ?: -99f,
-                wtrTempB = wtrTempB ?: -99f,
-                botDep = botDep ?: -99f,
+                wtrTempS = wtrTempS.toFloatOrDefault(),
+                surDep = surDep.toFloatOrDefault(),
+                wtrTempM = wtrTempM.toFloatOrDefault(),
+                midDep = midDep.toFloatOrDefault(),
+                wtrTempB = wtrTempB.toFloatOrDefault(),
+                botDep = botDep.toFloatOrDefault(),
                 lon = lon ?: -99f,
                 lat = lat ?: -99f,
                 dateT = dateT

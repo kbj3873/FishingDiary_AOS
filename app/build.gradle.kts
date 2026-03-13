@@ -6,13 +6,13 @@ plugins {
 }
 
 android {
-    namespace = "com.bj.fishingdiary"
+    namespace = "com.onbada.seathermo"
     compileSdk {
         version = release(36)
     }
 
     defaultConfig {
-        applicationId = "com.bj.fishingdiary"
+        applicationId = "com.onbada.seathermo"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

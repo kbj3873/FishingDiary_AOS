@@ -149,7 +149,7 @@
                             android:textSize="14sp"
                             android:textColor="@android:color/darker_gray" />
 
-                        <com.bj.fishingdiary.presentation.seawatertemperature.TemperatureLineGraphView
+                        <com.onbada.seathermo.presentation.seawatertemperature.TemperatureLineGraphView
                             android:id="@+id/surGraphView"
                             android:layout_width="match_parent"
                             android:layout_height="200dp"
@@ -197,7 +197,7 @@
                             android:textSize="14sp"
                             android:textColor="@android:color/darker_gray" />
 
-                        <com.bj.fishingdiary.presentation.seawatertemperature.TemperatureLineGraphView
+                        <com.onbada.seathermo.presentation.seawatertemperature.TemperatureLineGraphView
                             android:id="@+id/midGraphView"
                             android:layout_width="match_parent"
                             android:layout_height="200dp"
@@ -245,7 +245,7 @@
                             android:textSize="14sp"
                             android:textColor="@android:color/darker_gray" />
 
-                        <com.bj.fishingdiary.presentation.seawatertemperature.TemperatureLineGraphView
+                        <com.onbada.seathermo.presentation.seawatertemperature.TemperatureLineGraphView
                             android:id="@+id/botGraphView"
                             android:layout_width="match_parent"
                             android:layout_height="200dp"

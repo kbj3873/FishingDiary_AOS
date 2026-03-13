@@ -30,6 +30,13 @@ android {
         // BuildConfig에 API 키 추가
         buildConfigField("String", "RISA_API_KEY", "\"${localProperties.getProperty("RISA_API_KEY", "")}\"")
         buildConfigField("String", "API_BASE_URL", "\"${localProperties.getProperty("API_BASE_URL", "")}\"")
+        // Map API Keys
+        buildConfigField("String", "GOOGLE_MAPS_KEY", "\"${localProperties.getProperty("GOOGLE_MAPS_KEY", "")}\"")
+        buildConfigField("String", "KAKAO_APP_KEY", "\"${localProperties.getProperty("KAKAO_APP_KEY", "")}\"")
+
+        // Manifest에서 사용할 수 있도록 변수 주입
+        manifestPlaceholders["GOOGLE_MAPS_KEY"] = localProperties.getProperty("GOOGLE_MAPS_KEY", "")
+        manifestPlaceholders["KAKAO_APP_KEY"] = localProperties.getProperty("KAKAO_APP_KEY", "")
     }
 
     buildTypes {
@@ -64,6 +71,7 @@ dependencies {
     // UI Components
     implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2") // For viewModelScope
 
     // JSON serialization/deserialization
     implementation("com.google.code.gson:gson:2.10.1")
@@ -80,6 +88,8 @@ dependencies {
 
     // KakaoMap SDK
     implementation("com.kakao.maps.open:android:2.13.0")
+    // Google Maps SDK
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

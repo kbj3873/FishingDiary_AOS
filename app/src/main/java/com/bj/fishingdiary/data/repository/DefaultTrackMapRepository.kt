@@ -1,5 +1,6 @@
 package com.bj.fishingdiary.data.repository
 
+import com.bj.fishingdiary.data.storage.FileCreateResult
 import com.bj.fishingdiary.data.storage.FileDataStorage
 import com.bj.fishingdiary.domain.common.Cancellable
 import com.bj.fishingdiary.domain.entity.LocationData
@@ -20,6 +21,14 @@ class DefaultTrackMapRepository(
     // 현재 추적 중인 위치 데이터를 메모리에 임시 저장
     // Temporarily store currently tracking location data in memory
     private val trackingDataCache = mutableListOf<LocationData>()
+
+    override fun createPointDate(): FileCreateResult {
+        return fileStorage.createPointDate()
+    }
+
+    override fun createPointData(): FileCreateResult {
+        return fileStorage.createPointData()
+    }
 
     override fun saveTrackingLocation(
         locationData: LocationData,

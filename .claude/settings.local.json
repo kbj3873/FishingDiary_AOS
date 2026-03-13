@@ -6,6 +6,9 @@
       "Bash(cp:*)"
     ],
     "deny": [],
-    "ask": []
+    "ask": [],
+    "additionalDirectories": [
+      "/Users/kimbyeongjoon/Documents/workspace_git/FishingDiary"
+    ]
   }
 }

@@ -89,6 +89,14 @@ class FDLocationManager private constructor(private val context: Context) {
     var saveComplete: ((List<LocationData>) -> Unit)? = null
 
     /**
+     * 위치 업데이트 콜백
+     * Location update callback
+     *
+     * TrackMapViewModel 등에서 실시간 위치를 받기 위한 콜백
+     */
+    private var locationUpdateCallback: ((Location) -> Unit)? = null
+
+    /**
      * 추적 중 여부
      * Is tracking
      */
@@ -114,8 +122,11 @@ class FDLocationManager private constructor(private val context: Context) {
      * iOS의 startTracking()에 대응
      */
     fun startTracking(onPermissionDenied: (() -> Unit)? = null) {
+        android.util.Log.d("Location Debug", "FDLocationManager.startTracking called")
+
         // 이미 추적 중이면 무시
         if (isTracking) {
+            android.util.Log.d("Location Debug", "Already tracking, ignoring start request")
             return
         }
 
@@ -123,13 +134,15 @@ class FDLocationManager private constructor(private val context: Context) {
         sequenceNum = 0
         initLocation()
 
-        // 권한 체크
-        if (!LocationPermissionHelper.hasAllPermissions(context, includeBackground = true)) {
+        // 권한 체크 (위치 권한만 필수, 알림 권한은 선택사항)
+        if (!LocationPermissionHelper.hasLocationPermission(context)) {
+            android.util.Log.e("Location Debug", "Starting tracking failed: Missing LOCATION permission")
             onPermissionDenied?.invoke()
             return
         }
 
         // 추적 시작
+        android.util.Log.d("Location Debug", "Permission check passed, starting service...")
         isTracking = true
 
         // Foreground Service 시작
@@ -175,8 +188,10 @@ class FDLocationManager private constructor(private val context: Context) {
     fun addLocation(location: Location) {
         // 추적 중이 아니면 무시
         if (!isTracking) {
+            android.util.Log.d("Location Debug", "Manager received location but tracking is OFF")
             return
         }
+        android.util.Log.d("Location Debug", "Manager received location: ${location.latitude}, ${location.longitude}")
 
         // 위도/경도 (소수점 6자리)
         val lat = String.format("%.6f", location.latitude)
@@ -215,6 +230,9 @@ class FDLocationManager private constructor(private val context: Context) {
 
         // 로그 출력
         println("location data : $locationData")
+
+        // 위치 업데이트 콜백 호출
+        locationUpdateCallback?.invoke(location)
 
         // MapLineInfo 업데이트 (StateFlow)
         if (locationList.size >= 2) {
@@ -257,4 +275,12 @@ class FDLocationManager private constructor(private val context: Context) {
      * Is tracking
      */
     fun isTracking(): Boolean = isTracking
+
+    /**
+     * 위치 업데이트 콜백 설정
+     * Set location update callback
+     */
+    fun setLocationUpdateCallback(callback: ((Location) -> Unit)?) {
+        locationUpdateCallback = callback
+    }
 }

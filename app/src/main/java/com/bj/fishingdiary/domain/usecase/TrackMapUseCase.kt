@@ -1,5 +1,6 @@
 package com.bj.fishingdiary.domain.usecase
 
+import com.bj.fishingdiary.data.storage.FileCreateResult
 import com.bj.fishingdiary.domain.common.Cancellable
 import com.bj.fishingdiary.domain.entity.LocationData
 import com.bj.fishingdiary.domain.repository.TrackMapRepository
@@ -13,15 +14,39 @@ import com.bj.fishingdiary.domain.repository.TrackMapRepository
  *
  * 추적 흐름:
  * Tracking flow:
- * 1. clearTrackingData() - 새로운 추적 시작 전 초기화
- * 2. saveTrackingLocation() - GPS 위치 업데이트마다 호출
- * 3. saveTrackToFile() - 추적 종료 시 파일로 저장
+ * 1. createPointDate() - 날짜 폴더 생성
+ * 2. createPointData() - 데이터 폴더 생성
+ * 3. clearTrackingData() - 새로운 추적 시작 전 초기화
+ * 4. saveTrackingLocation() - GPS 위치 업데이트마다 호출
+ * 5. saveTrackToFile() - 추적 종료 시 파일로 저장
  *
  * @property trackMapRepository 트랙 지도 Repository
  */
 class TrackMapUseCase(
     private val trackMapRepository: TrackMapRepository
 ) : UseCase {
+
+    /**
+     * 포인트 날짜 폴더 생성 실행
+     * Execute create point date folder
+     *
+     * 새로운 추적을 시작하기 전에 호출됩니다
+     * Called before starting a new tracking session
+     */
+    fun executeCreatePointDate(): FileCreateResult {
+        return trackMapRepository.createPointDate()
+    }
+
+    /**
+     * 포인트 데이터 폴더 생성 실행
+     * Execute create point data folder
+     *
+     * 새로운 추적을 시작하기 전에 호출됩니다
+     * Called before starting a new tracking session
+     */
+    fun executeCreatePointData(): FileCreateResult {
+        return trackMapRepository.createPointData()
+    }
 
     /**
      * 추적 위치 저장 실행

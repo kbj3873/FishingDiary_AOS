@@ -11,6 +11,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.bj.fishingdiary.R
 import com.bj.fishingdiary.application.di.DataServiceDIContainer
 import com.bj.fishingdiary.domain.entity.MapType
+import com.bj.fishingdiary.managers.FDAppManager
 import kotlinx.coroutines.launch
 
 /**
@@ -56,14 +57,14 @@ class MainHomeActivity : AppCompatActivity() {
 
     // 지도 선택 버튼들
     // Map selection buttons
-    private lateinit var btnAppleMap: Button        // Apple Map 버튼
+    private lateinit var btnGoogleMap: Button        // Google Map 버튼
     private lateinit var btnKakaoMap: Button        // Kakao Map 버튼
 
     /**
      * 현재 선택된 지도 타입을 저장하는 변수
      * Variable to store currently selected map type
      */
-    private var selectedMapType: MapType = MapType.APPLE_MAP
+    private var selectedMapType: MapType = MapType.GOOGLE_MAP
 
     /**
      * 최초 로드 여부를 저장하는 변수
@@ -178,7 +179,7 @@ class MainHomeActivity : AppCompatActivity() {
         btnStartTracking = findViewById(R.id.btnStartTracking)
 
         // 지도 선택 버튼 초기화
-        btnAppleMap = findViewById(R.id.btnAppleMap)
+        btnGoogleMap = findViewById(R.id.btnGoogleMap)
         btnKakaoMap = findViewById(R.id.btnKakaoMap)
     }
 
@@ -242,25 +243,27 @@ class MainHomeActivity : AppCompatActivity() {
 
         // 포인트 버튼 클릭 시
         btnPoint.setOnClickListener {
-            showToast("포인트 화면으로 이동합니다")
-            // TODO: 포인트 목록 화면으로 이동
+            val intent = android.content.Intent(this, com.bj.fishingdiary.presentation.point.list.PointDateListActivity::class.java)
+            startActivity(intent)
         }
 
         // 추적시작 버튼 클릭 시
         btnStartTracking.setOnClickListener {
-            showToast("추적을 시작합니다")
-            // TODO: GPS 추적 시작 및 트랙 맵 화면으로 이동
+            // Track Map Activity로 이동
+            val intent = android.content.Intent(this, com.bj.fishingdiary.presentation.track.TrackMapActivity::class.java)
+            startActivity(intent)
         }
 
         // ===== 지도 선택 버튼 클릭 리스너 설정 =====
         // Set up map selection button click listeners
 
-        // Apple Map 버튼 클릭 시
-        btnAppleMap.setOnClickListener {
-            if (selectedMapType != MapType.APPLE_MAP) {
-                selectedMapType = MapType.APPLE_MAP
+        // Google Map 버튼 클릭 시
+        btnGoogleMap.setOnClickListener {
+            if (selectedMapType != MapType.GOOGLE_MAP) {
+                selectedMapType = MapType.GOOGLE_MAP
+                FDAppManager.getInstance().setMapType(0) // 0: Google
                 updateMapButtonStyles()
-                showToast("Apple Map이 선택되었습니다")
+                showToast("Google Map이 선택되었습니다")
             }
         }
 
@@ -268,6 +271,7 @@ class MainHomeActivity : AppCompatActivity() {
         btnKakaoMap.setOnClickListener {
             if (selectedMapType != MapType.KAKAO_MAP) {
                 selectedMapType = MapType.KAKAO_MAP
+                FDAppManager.getInstance().setMapType(1) // 1: Kakao
                 updateMapButtonStyles()
                 showToast("Kakao Map이 선택되었습니다")
             }
@@ -318,16 +322,16 @@ class MainHomeActivity : AppCompatActivity() {
      */
     private fun updateMapButtonStyles() {
         when (selectedMapType) {
-            MapType.APPLE_MAP -> {
-                btnAppleMap.setBackgroundResource(R.drawable.button_background_selected)
+            MapType.GOOGLE_MAP -> {
+                btnGoogleMap.setBackgroundResource(R.drawable.button_background_selected)
                 btnKakaoMap.setBackgroundResource(R.drawable.button_background)
-                btnAppleMap.tag = "selected"
+                btnGoogleMap.tag = "selected"
                 btnKakaoMap.tag = "unselected"
             }
             MapType.KAKAO_MAP -> {
-                btnAppleMap.setBackgroundResource(R.drawable.button_background)
+                btnGoogleMap.setBackgroundResource(R.drawable.button_background)
                 btnKakaoMap.setBackgroundResource(R.drawable.button_background_selected)
-                btnAppleMap.tag = "unselected"
+                btnGoogleMap.tag = "unselected"
                 btnKakaoMap.tag = "selected"
             }
         }

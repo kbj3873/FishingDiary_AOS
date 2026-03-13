@@ -95,6 +95,8 @@ class LocationTrackingService : Service() {
                 val location = locationResult.locations.firstOrNull {
                     it.accuracy >= 0
                 } ?: return
+                
+                android.util.Log.d("Location Debug", "Service received location: ${location.latitude}, ${location.longitude}, accuracy=${location.accuracy}")
 
                 // FDLocationManager로 위치 전달
                 FDLocationManager.getInstance(applicationContext).addLocation(location)
@@ -103,6 +105,7 @@ class LocationTrackingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        android.util.Log.d("Location Debug", "LocationTrackingService started")
         // Foreground Service 시작
         val notification = createNotification()
         startForeground(NOTIFICATION_ID, notification)

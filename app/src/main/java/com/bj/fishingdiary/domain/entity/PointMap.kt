@@ -26,8 +26,8 @@ import com.google.gson.annotations.SerializedName
  * - KAKAO_MAP: Kakao Maps (한국 전용)
  */
 enum class MapType {
-    APPLE_MAP,    // Google Maps를 사용 (iOS Apple Maps에 대응)
-    KAKAO_MAP     // Kakao Maps
+    GOOGLE_MAP,    // Google Maps (Android Standard)
+    KAKAO_MAP      // Kakao Maps
 }
 
 /**

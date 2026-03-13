@@ -1,5 +1,6 @@
 package com.bj.fishingdiary.domain.repository
 
+import com.bj.fishingdiary.data.storage.FileCreateResult
 import com.bj.fishingdiary.domain.common.Cancellable
 import com.bj.fishingdiary.domain.entity.LocationData
 
@@ -19,6 +20,22 @@ import com.bj.fishingdiary.domain.entity.LocationData
  * - PointMap: Display saved specific points (individual markers)
  */
 interface TrackMapRepository {
+
+    /**
+     * 포인트 날짜 폴더 생성
+     * Create point date folder
+     *
+     * @return FileCreateResult - 성공 시 true, 실패 시 FileStorageError
+     */
+    fun createPointDate(): FileCreateResult
+
+    /**
+     * 포인트 데이터 폴더 생성
+     * Create point data folder
+     *
+     * @return FileCreateResult - 성공 시 true, 실패 시 FileStorageError
+     */
+    fun createPointData(): FileCreateResult
 
     /**
      * 현재 추적 중인 위치 데이터 저장

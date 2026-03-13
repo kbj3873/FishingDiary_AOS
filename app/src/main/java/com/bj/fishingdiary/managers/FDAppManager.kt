@@ -60,7 +60,7 @@ class FDAppManager private constructor() {
      *
      * 기본값: APPLE_MAP (Android에서는 Google Maps)
      */
-    var mapType: MapType = MapType.APPLE_MAP
+    var mapType: MapType = MapType.GOOGLE_MAP
         private set
 
     // ==================== 초기화 ====================
@@ -83,13 +83,13 @@ class FDAppManager private constructor() {
      * 지도 타입 설정
      * Set Map Type
      *
-     * @param rawValue 지도 타입 정수값 (0: Apple/Google Map, 1: Kakao Map)
+     * @param rawValue 지도 타입 정수값 (0: Google Map, 1: Kakao Map)
      */
     fun setMapType(rawValue: Int) {
         mapType = when (rawValue) {
-            0 -> MapType.APPLE_MAP
+            0 -> MapType.GOOGLE_MAP
             1 -> MapType.KAKAO_MAP
-            else -> MapType.APPLE_MAP
+            else -> MapType.GOOGLE_MAP
         }
     }
 }

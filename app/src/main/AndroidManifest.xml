@@ -21,6 +21,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
+        android:name=".FDApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -29,6 +30,17 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.FishingDiary">
+
+        <!-- Google Maps API Key -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${GOOGLE_MAPS_KEY}" />
+
+        <!-- Kakao Maps API Key -->
+        <meta-data
+            android:name="com.kakao.sdk.AppKey"
+            android:value="${KAKAO_APP_KEY}" />
+
         <activity
             android:name=".presentation.main.MainHomeActivity"
             android:exported="true">
@@ -47,6 +59,24 @@
         <!-- Sea Water Temperature Activity -->
         <activity
             android:name=".presentation.seawatertemperature.SeaWaterTemperatureActivity"
+            android:exported="false" />
+
+        <!-- Point Map Activity -->
+        <activity
+            android:name=".presentation.point.PointMapActivity"
+            android:exported="false" />
+
+        <!-- Point Selection Activities -->
+        <activity
+            android:name=".presentation.point.list.PointDateListActivity"
+            android:exported="false" />
+        <activity
+            android:name=".presentation.point.list.PointDataListActivity"
+            android:exported="false" />
+
+        <!-- Track Map Activity -->
+        <activity
+            android:name=".presentation.track.TrackMapActivity"
             android:exported="false" />
 
         <!-- Location Tracking Foreground Service -->

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".presentation.point.PointMapActivity">
+
+    <!-- 지도 컨테이너 (Google/Kakao Map Fragment가 들어갈 곳) -->
+    <FrameLayout
+        android:id="@+id/map_container"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- 상단 정보 오버레이 (마커 클릭 시 표시) -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/info_view"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:visibility="gone"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="4dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#FFFFFFFF"
+            android:padding="16dp">
+
+            <!-- Time -->
+            <TextView
+                android:id="@+id/tv_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="time: 2024-01-01 12:00:00"
+                android:textColor="#333333"
+                android:textSize="14sp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <!-- Sequence -->
+            <TextView
+                android:id="@+id/tv_sequence"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="sequence: 1"
+                android:textColor="#666666"
+                android:textSize="12sp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/tv_time" />
+
+            <!-- Lat/Lon Info -->
+            <TextView
+                android:id="@+id/tv_lat"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="lat: 37.123456"
+                android:textColor="#333333"
+                android:textSize="14sp"
+                app:layout_constraintEnd_toStartOf="@+id/btn_convert"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/tv_sequence" />
+
+            <TextView
+                android:id="@+id/tv_lon"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="lon: 128.123456"
+                android:textColor="#333333"
+                android:textSize="14sp"
+                app:layout_constraintEnd_toStartOf="@+id/btn_convert"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/tv_lat" />
+
+            <!-- Speed Info -->
+            <TextView
+                android:id="@+id/tv_kmh"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="10.5 km/h"
+                android:textColor="#0000FF"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/tv_lon" />
+
+            <TextView
+                android:id="@+id/tv_knot"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="5.6 knot"
+                android:textColor="#0000FF"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                app:layout_constraintBottom_toBottomOf="@+id/tv_kmh"
+                app:layout_constraintStart_toEndOf="@+id/tv_kmh"
+                app:layout_constraintTop_toTopOf="@+id/tv_kmh" />
+
+            <!-- Convert Button -->
+            <Button
+                android:id="@+id/btn_convert"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="D"
+                app:layout_constraintBottom_toBottomOf="@+id/tv_lon"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="@+id/tv_lat" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </androidx.cardview.widget.CardView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -24,13 +24,28 @@ class AppConfiguration {
         }
 
     /**
-     * API Base URL
+     * NIFS API Base URL (국립수산과학원 해양 데이터).
+     *
+     * iOS의 apiNifsURL에 대응합니다.
      */
-    val apiBaseURL: String
+    val apiNifsURL: String
         get() {
             require(BuildConfig.API_BASE_URL.isNotEmpty()) {
                 "API_BASE_URL must not be empty in local.properties"
             }
             return BuildConfig.API_BASE_URL
+        }
+
+    /**
+     * 온바다 서버 API Base URL (자체 서비스).
+     *
+     * iOS의 apiOnbadaURL에 대응합니다.
+     */
+    val apiOnbadaURL: String
+        get() {
+            require(BuildConfig.ONBADA_BASE_URL.isNotEmpty()) {
+                "ONBADA_BASE_URL must not be empty in local.properties"
+            }
+            return BuildConfig.ONBADA_BASE_URL
         }
 }

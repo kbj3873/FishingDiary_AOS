@@ -1,14 +1,19 @@
 package com.onbada.seathermo.infrastructure.network
 
-import android.net.Uri
 import com.google.gson.Gson
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.net.URLEncoder
 
 /**
- * HTTP 메서드 타입
- * HTTP Method Type
+ * HTTP 메서드 타입.
  *
- * iOS의 HTTPMethodType에 대응
+ * [개념] enum class는 정해진 상수 집합을 타입으로 정의합니다.
+ *        각 상수에 값(value)을 연결하면 .value로 원시 문자열에 접근할 수 있습니다.
+ *        Swift의 enum HTTPMethodType: String { case get = "GET" }에 대응합니다.
+ *
+ * iOS의 HTTPMethodType에 대응합니다.
  */
 enum class HTTPMethodType(val value: String) {
     GET("GET"),
@@ -20,18 +25,26 @@ enum class HTTPMethodType(val value: String) {
 }
 
 /**
- * Body 인코더 인터페이스
- * Body Encoder Interface
+ * Body 인코더 인터페이스.
+ *
+ * [개념] interface는 Swift의 protocol과 동일합니다.
+ *        Body 파라미터를 ByteArray로 변환하는 전략(strategy) 패턴입니다.
+ *
+ * iOS의 BodyEncoder protocol에 대응합니다.
  */
 interface BodyEncoder {
     fun encode(parameters: Map<String, Any>): ByteArray?
 }
 
 /**
- * JSON Body 인코더
- * JSON Body Encoder
+ * JSON Body 인코더.
+ *
+ * 파라미터를 JSON 문자열로 변환 후 UTF-8 바이트 배열로 인코딩합니다.
+ * iOS의 JSONBodyEncoder에 대응합니다.
  */
 class JSONBodyEncoder : BodyEncoder {
+    // [개념] Gson은 Google이 만든 JSON 직렬화/역직렬화 라이브러리입니다.
+    //        Swift의 JSONEncoder/JSONDecoder에 대응합니다.
     private val gson = Gson()
 
     override fun encode(parameters: Map<String, Any>): ByteArray? {
@@ -44,8 +57,10 @@ class JSONBodyEncoder : BodyEncoder {
 }
 
 /**
- * ASCII Body 인코더 (Query String 형태)
- * ASCII Body Encoder (Query String format)
+ * ASCII Body 인코더 (form-encoded).
+ *
+ * 파라미터를 application/x-www-form-urlencoded 형식으로 인코딩합니다.
+ * iOS의 AsciiBodyEncoder에 대응합니다.
  */
 class AsciiBodyEncoder : BodyEncoder {
     override fun encode(parameters: Map<String, Any>): ByteArray? {
@@ -53,116 +68,110 @@ class AsciiBodyEncoder : BodyEncoder {
     }
 }
 
-/**
- * Response Decoder 인터페이스
- * Response Decoder Interface
- */
-interface ResponseDecoder {
-    fun <T> decode(data: ByteArray, type: Class<T>): T
-}
+// MARK: - Endpoint
 
 /**
- * JSON Response Decoder
- */
-class JSONResponseDecoder : ResponseDecoder {
-    private val gson = Gson()
-
-    override fun <T> decode(data: ByteArray, type: Class<T>): T {
-        val json = String(data, Charsets.UTF_8)
-        return gson.fromJson(json, type)
-    }
-}
-
-/**
- * Requestable 인터페이스
- * Requestable Interface
+ * 제네릭 네트워크 엔드포인트.
  *
- * iOS의 Requestable protocol에 대응
- */
-interface Requestable {
-    val path: String
-    val isFullPath: Boolean
-    val method: HTTPMethodType
-    val headerParameters: Map<String, String>
-    val queryParametersEncodable: Any?
-    val queryParameters: Map<String, Any>
-    val bodyParametersEncodable: Any?
-    val bodyParameters: Map<String, Any>
-    val bodyEncoder: BodyEncoder
-
-    /**
-     * NetworkConfig를 사용하여 URL 생성
-     * Generate URL using NetworkConfig
-     */
-    fun url(config: NetworkConfigurable): String {
-        val baseURL = if (config.baseURL.last() != '/') {
-            "${config.baseURL}/"
-        } else {
-            config.baseURL
-        }
-
-        val endpoint = if (isFullPath) path else "$baseURL$path"
-
-        // Query Parameters 조합
-        val allQueryParams = mutableMapOf<String, String>()
-
-        // queryParametersEncodable을 Dictionary로 변환 (TODO: 실제 구현 시 Gson 활용)
-        queryParameters.forEach { (key, value) ->
-            allQueryParams[key] = value.toString()
-        }
-
-        // Config의 queryParameters 추가
-        config.queryParameters.forEach { (key, value) ->
-            allQueryParams[key] = value
-        }
-
-        return if (allQueryParams.isNotEmpty()) {
-            "$endpoint?${allQueryParams.toQueryString()}"
-        } else {
-            endpoint
-        }
-    }
-}
-
-/**
- * ResponseRequestable 인터페이스
- * Response Requestable Interface
+ * [개념] data class는 equals/hashCode/toString/copy를 자동 생성하는 클래스입니다.
+ *        Swift의 struct와 유사하게 값 비교가 가능합니다.
  *
- * iOS의 ResponseRequestable protocol에 대응
- */
-interface ResponseRequestable<R> : Requestable {
-    val responseDecoder: ResponseDecoder
-}
-
-/**
- * Endpoint 클래스
- * Endpoint Class
+ * [개념] 타입 파라미터 <R>은 이 엔드포인트의 응답 DTO 타입을 나타냅니다.
+ *        예: Endpoint<RisaListResponseDTO>이면 응답을 RisaListResponseDTO로 디코딩합니다.
+ *        iOS의 Endpoint<Response>에 대응합니다.
  *
- * iOS의 Endpoint<R> class에 대응
+ * iOS의 Endpoint.swift Endpoint<Response> class에 대응합니다.
  */
 data class Endpoint<R>(
-    override val path: String,
-    override val isFullPath: Boolean = false,
-    override val method: HTTPMethodType,
-    override val headerParameters: Map<String, String> = emptyMap(),
-    override val queryParametersEncodable: Any? = null,
-    override val queryParameters: Map<String, Any> = emptyMap(),
-    override val bodyParametersEncodable: Any? = null,
-    override val bodyParameters: Map<String, Any> = emptyMap(),
-    override val bodyEncoder: BodyEncoder = JSONBodyEncoder(),
-    override val responseDecoder: ResponseDecoder = JSONResponseDecoder()
-) : ResponseRequestable<R>
+    val baseURL: String,
+    val path: String,
+    val isFullPath: Boolean = false,
+    val method: HTTPMethodType,
+    val headerParameters: Map<String, String> = emptyMap(),
+    val queryParameters: Map<String, Any> = emptyMap(),
+    val bodyParameters: Map<String, Any> = emptyMap(),
+    val bodyEncoder: BodyEncoder = JSONBodyEncoder()
+) {
 
-/**
- * Request Generation Error
- */
+    /**
+     * 엔드포인트의 전체 URL 문자열을 생성합니다.
+     *
+     * [개념] if 표현식은 값을 반환할 수 있습니다.
+     *        Swift의 let basePath = baseURL.last == "/" ? baseURL : baseURL + "/"와 동일합니다.
+     *
+     * iOS의 Endpoint.url()에 대응합니다.
+     */
+    fun url(): String {
+        // [개념] endsWith()는 문자열이 특정 접미사로 끝나는지 확인합니다.
+        //        Swift의 hasSuffix("/")에 대응합니다.
+        val basePath = if (baseURL.endsWith("/")) baseURL else "$baseURL/"
+        val endpointString = if (isFullPath) path else "$basePath$path"
+
+        // 쿼리 파라미터가 없으면 경로만 반환합니다.
+        if (queryParameters.isEmpty()) return endpointString
+
+        // [개념] joinToString()은 컬렉션 요소를 구분자로 연결해 하나의 문자열로 합칩니다.
+        //        Swift의 .joined(separator: "&")에 대응합니다.
+        val queryString = queryParameters.map { (key, value) ->
+            val encodedKey = URLEncoder.encode(key, "UTF-8")
+            val encodedValue = URLEncoder.encode(value.toString(), "UTF-8")
+            "$encodedKey=$encodedValue"
+        }.joinToString("&")
+
+        return "$endpointString?$queryString"
+    }
+
+    /**
+     * OkHttp Request 객체를 생성합니다.
+     *
+     * iOS의 Endpoint.urlRequest() → URLRequest에 대응합니다.
+     * Android에서는 OkHttp의 Request 객체를 반환합니다.
+     *
+     * [개념] OkHttp의 Request.Builder()는 빌더 패턴으로 Request를 구성합니다.
+     *        .url().addHeader().method().build() 체이닝으로 객체를 완성합니다.
+     *        iOS의 var urlRequest = URLRequest(url: url)에 대응합니다.
+     */
+    fun urlRequest(): Request {
+        val requestBuilder = Request.Builder().url(url())
+
+        // 헤더 설정
+        headerParameters.forEach { (key, value) ->
+            requestBuilder.addHeader(key, value)
+        }
+
+        // Body 설정
+        if (bodyParameters.isNotEmpty()) {
+            val bodyData = bodyEncoder.encode(bodyParameters)
+            if (bodyData != null) {
+                val mediaType = "application/json; charset=utf-8".toMediaType()
+                requestBuilder.method(method.value, bodyData.toRequestBody(mediaType))
+            }
+        } else {
+            // [개념] GET/HEAD/DELETE는 body 없이, POST/PUT/PATCH는 빈 body로 전송합니다.
+            //        HTTP 스펙에서 GET 요청에 body를 포함하면 일부 서버가 거부할 수 있습니다.
+            when (method) {
+                HTTPMethodType.GET, HTTPMethodType.HEAD, HTTPMethodType.DELETE ->
+                    requestBuilder.method(method.value, null)
+                else ->
+                    requestBuilder.method(method.value, ByteArray(0).toRequestBody())
+            }
+        }
+
+        return requestBuilder.build()
+    }
+}
+
+// 요청 생성 에러. iOS의 RequestGenerationError에 대응합니다.
 class RequestGenerationException(message: String) : Exception(message)
 
-// ==================== Extension Functions ====================
+// ==================== Private Extensions ====================
 
 /**
- * Map을 Query String으로 변환
- * Convert Map to Query String
+ * Map을 URL Query String으로 변환합니다.
+ *
+ * [개념] private fun Map<...>.toQueryString()는 확장 함수(extension function)입니다.
+ *        기존 클래스에 새로운 메서드를 추가하는 Kotlin 고유 기능입니다.
+ *        Swift의 private extension Dictionary { var queryString: String }에 대응합니다.
  */
 private fun Map<String, Any>.toQueryString(): String {
     return this.map { (key, value) ->

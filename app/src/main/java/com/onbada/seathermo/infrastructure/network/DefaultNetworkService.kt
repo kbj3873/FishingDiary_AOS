@@ -3,140 +3,174 @@ package com.onbada.seathermo.infrastructure.network
 import android.util.Log
 import com.onbada.seathermo.BuildConfig
 import okhttp3.*
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.nio.charset.Charset
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.suspendCancellableCoroutine
+
+// ==================== Network Error ====================
 
 /**
- * Network Error
+ * 네트워크 오류 sealed class.
  *
- * iOS의 NetworkError에 대응
+ * [개념] sealed class는 정해진 하위 타입만 존재하는 제한된 계층 구조입니다.
+ *        Swift의 enum with associated values에 대응합니다.
+ *        when 분기에서 모든 케이스를 처리하면 else가 불필요합니다.
+ *
+ * iOS의 NetworkError enum에 대응합니다.
  */
 sealed class NetworkError : Exception() {
     data class HttpError(val statusCode: Int, val data: ByteArray?) : NetworkError() {
-        override val message: String
-            get() = "HTTP Error: $statusCode"
+        override val message: String get() = "HTTP Error: $statusCode"
     }
 
     object NotConnected : NetworkError() {
-        override val message: String
-            get() = "Not connected to internet"
+        override val message: String get() = "Not connected to internet"
     }
 
     object Cancelled : NetworkError() {
-        override val message: String
-            get() = "Request cancelled"
+        override val message: String get() = "Request cancelled"
     }
 
     data class Generic(val error: Throwable) : NetworkError() {
-        override val message: String
-            get() = "Generic error: ${error.message}"
+        override val message: String get() = "Generic error: ${error.message}"
     }
 
     object UrlGeneration : NetworkError() {
-        override val message: String
-            get() = "URL generation failed"
+        override val message: String get() = "URL generation failed"
     }
 
     object NoData : NetworkError() {
-        override val message: String
-            get() = "No response data"
+        override val message: String get() = "No response data"
+    }
+
+    // iOS의 .apiError(code:message:)에 대응합니다.
+    data class ApiError(val code: String, val apiMessage: String = "") : NetworkError() {
+        override val message: String get() = "API Error: $code $apiMessage"
     }
 }
 
+// ==================== Network Service ====================
+
 /**
- * Network Service 인터페이스
- * Network Service Interface
+ * 네트워크 서비스 인터페이스.
  *
- * iOS의 NetworkService protocol에 대응
+ * [개념] interface는 Swift의 protocol과 동일합니다.
+ *        구현체(DefaultNetworkService)와 분리하여 테스트 용이성을 확보합니다.
+ *
+ * iOS의 NetworkService protocol에 대응합니다.
  */
 interface NetworkService {
-    fun request(
-        endpoint: Requestable,
-        completion: (Result<ByteArray?>) -> Unit
-    ): NetworkCancellable?
+    // 엔드포인트 팩토리에서 사용할 베이스 URL.
+    // iOS의 var baseURL: String { get }에 대응합니다.
+    val baseURL: String
+
+    /**
+     * 엔드포인트에 네트워크 요청을 수행하고 원시 바이트 데이터를 반환합니다.
+     *
+     * [개념] suspend fun은 코루틴 안에서만 호출할 수 있는 일시 중단 함수입니다.
+     *        Swift의 async func에 대응합니다.
+     *        호출 측에서 try-catch로 에러를 처리합니다.
+     */
+    suspend fun requestData(endpoint: Endpoint<*>): ByteArray
 }
 
-/**
- * Network Session Manager 인터페이스
- * Network Session Manager Interface
- */
-interface NetworkSessionManager {
-    fun request(
-        request: Request,
-        completion: (ByteArray?, Response?, Throwable?) -> Unit
-    ): NetworkCancellable
-}
+// ==================== Implementation ====================
 
 /**
- * Network Error Logger 인터페이스
- * Network Error Logger Interface
- */
-interface NetworkErrorLogger {
-    fun log(request: Request)
-    fun log(responseData: ByteArray?, response: Response?)
-    fun log(error: Throwable)
-}
-
-/**
- * Default Network Service 구현체
- * Default Network Service Implementation
+ * OkHttp 기반 NetworkService 구현체.
  *
- * iOS의 DefaultNetworkService에 대응
+ * [개념] class DefaultNetworkService(...) : NetworkService 는
+ *        NetworkService 인터페이스를 구현하는 구체 클래스입니다.
+ *        Swift의 final class DefaultNetworkService: NetworkService에 대응합니다.
+ *
+ * [개념] 생성자의 기본값 파라미터(= OkHttpClient() 등)를 통해
+ *        테스트 시 가짜(mock) 객체를 주입할 수 있습니다.
+ *        Swift의 init(session: URLSession = .shared)에 대응합니다.
+ *
+ * iOS의 DefaultNetworkService에 대응합니다.
  */
 class DefaultNetworkService(
-    private val config: NetworkConfigurable,
-    private val sessionManager: NetworkSessionManager = DefaultNetworkSessionManager(),
+    override val baseURL: String,
+    private val client: OkHttpClient = OkHttpClient(),
     private val logger: NetworkErrorLogger = DefaultNetworkErrorLogger()
 ) : NetworkService {
 
-    // EUC-KR 인코딩 (www.nifs.go.kr에서 사용)
+    // NIFS 웹사이트의 EUC-KR 인코딩 처리에 사용합니다.
+    // iOS의 private let encEUC_KR에 대응합니다.
     private val eucKrCharset = Charset.forName("EUC-KR")
 
-    override fun request(
-        endpoint: Requestable,
-        completion: (Result<ByteArray?>) -> Unit
-    ): NetworkCancellable? {
-        return try {
-            val urlRequest = buildRequest(endpoint, config)
-            request(urlRequest, completion)
-        } catch (e: Exception) {
-            completion(Result.failure(NetworkError.UrlGeneration))
-            null
-        }
-    }
+    /**
+     * 네트워크 요청을 수행하고 응답 바이트 데이터를 반환합니다.
+     *
+     * [개념] suspendCancellableCoroutine { continuation -> }은
+     *        콜백(callback) 기반 API를 코루틴(suspend) 방식으로 변환합니다.
+     *        continuation.resume()으로 결과를 반환하고,
+     *        continuation.resumeWithException()으로 에러를 전파합니다.
+     *        Swift의 withCheckedThrowingContinuation { }에 대응합니다.
+     *
+     * [개념] OkHttp의 enqueue()는 비동기 HTTP 호출입니다.
+     *        내부적으로 별도 스레드에서 네트워크 통신을 수행하고,
+     *        완료 시 Callback의 onResponse/onFailure를 호출합니다.
+     *        iOS의 URLSession.data(for: urlRequest)에 대응합니다.
+     *
+     * [개념] continuation.invokeOnCancellation { }은 코루틴이 취소될 때
+     *        진행 중인 HTTP 요청도 함께 취소합니다.
+     *        ViewModel이 소멸되면(예: 화면 전환) 불필요한 네트워크 요청이 자동 정리됩니다.
+     */
+    override suspend fun requestData(endpoint: Endpoint<*>): ByteArray {
+        val okHttpRequest = endpoint.urlRequest()
+        logger.log(okHttpRequest)
 
-    private fun request(
-        request: Request,
-        completion: (Result<ByteArray?>) -> Unit
-    ): NetworkCancellable {
-        logger.log(request)
+        return suspendCancellableCoroutine { continuation ->
+            val call = client.newCall(okHttpRequest)
 
-        return sessionManager.request(request) { data, response, error ->
-            if (error != null) {
-                val networkError = when {
-                    response != null -> NetworkError.HttpError(
-                        response.code,
-                        data
-                    )
-                    else -> resolveError(error)
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    val networkError = resolveError(e)
+                    logger.log(networkError)
+                    continuation.resumeWithException(networkError)
                 }
 
-                logger.log(networkError)
-                completion(Result.failure(networkError))
-            } else {
-                val resolvedData = resolveData(data)
-                if (resolvedData == null) {
-                    completion(Result.failure(NetworkError.NoData))
-                } else {
+                override fun onResponse(call: Call, response: Response) {
+                    val data = response.body?.bytes()
+
+                    // HTTP 상태 코드 검사 (200~299가 아니면 오류)
+                    // [개념] response.isSuccessful은 HTTP 200~299 범위를 확인합니다.
+                    //        iOS의 !(200...299).contains(httpResponse.statusCode)에 대응합니다.
+                    if (!response.isSuccessful) {
+                        val error = NetworkError.HttpError(response.code, data)
+                        logger.log(error)
+                        continuation.resumeWithException(error)
+                        return
+                    }
+
+                    if (data == null) {
+                        continuation.resumeWithException(NetworkError.NoData)
+                        return
+                    }
+
+                    // EUC-KR → UTF-8 변환 (NIFS 웹사이트 대응)
+                    val resolvedData = resolveData(data)
                     logger.log(resolvedData, response)
-                    completion(Result.success(resolvedData))
+                    continuation.resume(resolvedData)
                 }
-            }
+            })
+
+            // 코루틴 취소 시 OkHttp Call도 취소합니다.
+            continuation.invokeOnCancellation { call.cancel() }
         }
     }
 
+    /**
+     * 네트워크 에러를 NetworkError 타입으로 변환합니다.
+     *
+     * [개념] when { } 은 Swift의 switch 문과 동일하지만 조건식을 사용할 수 있습니다.
+     *        is 키워드는 Swift의 case let error as IOException와 동일합니다.
+     *
+     * iOS의 private func resolve(error:)에 대응합니다.
+     */
     private fun resolveError(error: Throwable): NetworkError {
         return when {
             error is IOException && error.message?.contains("canceled") == true ->
@@ -149,14 +183,12 @@ class DefaultNetworkService(
     }
 
     /**
-     * EUC-KR → UTF-8 변환
-     * www.nifs.go.kr에서 EUC-KR로 인코딩된 데이터를 UTF-8로 변환
+     * EUC-KR 인코딩된 데이터를 UTF-8로 변환합니다.
+     *
+     * www.nifs.go.kr API 일부는 EUC-KR로 응답하므로 UTF-8로 재인코딩합니다.
      */
-    private fun resolveData(data: ByteArray?): ByteArray? {
-        if (data == null) return null
-
+    private fun resolveData(data: ByteArray): ByteArray {
         return try {
-            // EUC-KR로 디코딩 시도
             val eucKrString = String(data, eucKrCharset)
             eucKrString.toByteArray(Charsets.UTF_8)
         } catch (e: Exception) {
@@ -164,78 +196,57 @@ class DefaultNetworkService(
             data
         }
     }
-
-    private fun buildRequest(endpoint: Requestable, config: NetworkConfigurable): Request {
-        val url = endpoint.url(config)
-
-        val requestBuilder = Request.Builder().url(url)
-
-        // Headers 설정
-        val allHeaders = config.headers.toMutableMap()
-        allHeaders.putAll(endpoint.headerParameters)
-        allHeaders.forEach { (key, value) ->
-            requestBuilder.addHeader(key, value)
-        }
-
-        // Body Parameters 설정
-        if (endpoint.bodyParameters.isNotEmpty()) {
-            val bodyData = endpoint.bodyEncoder.encode(endpoint.bodyParameters)
-            if (bodyData != null) {
-                val mediaType = "application/json; charset=utf-8".toMediaType()
-                requestBuilder.method(
-                    endpoint.method.value,
-                    bodyData.toRequestBody(mediaType)
-                )
-            }
-        } else {
-            // Body가 없는 경우
-            when (endpoint.method) {
-                HTTPMethodType.GET, HTTPMethodType.HEAD, HTTPMethodType.DELETE ->
-                    requestBuilder.method(endpoint.method.value, null)
-                else ->
-                    requestBuilder.method(endpoint.method.value, ByteArray(0).toRequestBody())
-            }
-        }
-
-        return requestBuilder.build()
-    }
 }
 
+// ==================== Suspend Extension ====================
+
 /**
- * Default Network Session Manager
+ * NetworkService의 제네릭 suspend 확장 함수.
  *
- * OkHttp를 사용한 기본 구현
+ * 원시 바이트를 받아 Gson으로 지정된 타입 R로 디코딩합니다.
+ *
+ * [개념] inline fun + reified R: 제네릭 타입 R을 런타임에도 알 수 있게 합니다.
+ *        일반적으로 Kotlin 제네릭은 런타임에 타입 정보가 사라지지만(Type Erasure),
+ *        reified를 사용하면 R::class.java처럼 실제 타입에 접근할 수 있습니다.
+ *        Gson이 JSON을 올바른 DTO 타입으로 역직렬화하기 위해 필요합니다.
+ *
+ * iOS에서는 Decodable 프로토콜 + 제네릭 func request<T: Decodable>이 이 역할을 수행합니다.
+ * Kotlin에서는 Type Erasure 때문에 reified inline 확장 함수가 필요합니다.
  */
-class DefaultNetworkSessionManager : NetworkSessionManager {
-    private val client = OkHttpClient()
+suspend inline fun <reified R : Any> NetworkService.request(
+    endpoint: Endpoint<R>
+): R {
+    // [개념] reified 타입 파라미터를 람다 밖에서 미리 캡처합니다.
+    //        R::class.java로 런타임 클래스 정보를 가져옵니다.
+    val responseClass = R::class.java
 
-    override fun request(
-        request: Request,
-        completion: (ByteArray?, Response?, Throwable?) -> Unit
-    ): NetworkCancellable {
-        val call = client.newCall(request)
+    // [개념] as Endpoint<*>로 타입 파라미터를 지워서 기본 request(Endpoint<*>) 메서드를 호출합니다.
+    //        스타 프로젝션(*)은 Swift의 Endpoint<Any>와 유사하게 타입 파라미터를 무시합니다.
+    val data = requestData(endpoint as Endpoint<*>)
+    val json = String(data, Charsets.UTF_8)
+    return com.google.gson.Gson().fromJson(json, responseClass)
+}
 
-        call.enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                completion(null, null, e)
-            }
+// ==================== Logger ====================
 
-            override fun onResponse(call: Call, response: Response) {
-                val data = response.body?.bytes()
-                completion(data, response, null)
-            }
-        })
-
-        return object : NetworkCancellable {
-            override fun cancel() {
-                call.cancel()
-            }
-        }
-    }
+/**
+ * 네트워크 에러 로거 인터페이스.
+ *
+ * iOS의 NetworkErrorLogger protocol에 대응합니다.
+ */
+interface NetworkErrorLogger {
+    fun log(request: Request)
+    fun log(responseData: ByteArray?, response: Response?)
+    fun log(error: Throwable)
 }
 
 /**
- * Default Network Error Logger
+ * 기본 네트워크 에러 로거 구현체.
+ *
+ * iOS의 DefaultNetworkErrorLogger에 대응합니다.
+ *
+ * [개념] companion object는 클래스에 속하는 정적(static) 멤버를 정의합니다.
+ *        Swift의 static let TAG = "NetworkService"에 대응합니다.
  */
 class DefaultNetworkErrorLogger : NetworkErrorLogger {
     companion object {
@@ -243,26 +254,19 @@ class DefaultNetworkErrorLogger : NetworkErrorLogger {
     }
 
     override fun log(request: Request) {
+        if (!BuildConfig.DEBUG) return
         Log.d(TAG, "-------------")
         Log.d(TAG, "request: ${request.url}")
         Log.d(TAG, "headers: ${request.headers}")
         Log.d(TAG, "method: ${request.method}")
-
-        request.body?.let { body ->
-            // Body 로깅 (개발 중에만)
-            if (BuildConfig.DEBUG) {
-                Log.d(TAG, "body: [RequestBody]")
-            }
-        }
     }
 
     override fun log(responseData: ByteArray?, response: Response?) {
-        if (responseData == null) return
-
-        if (BuildConfig.DEBUG) {
-            val dataString = String(responseData, Charsets.UTF_8)
-            Log.d(TAG, "responseData: ${dataString.take(500)}") // 처음 500자만 로깅
-        }
+        if (!BuildConfig.DEBUG || responseData == null) return
+        val dataString = String(responseData, Charsets.UTF_8)
+        // [개념] take(500)은 문자열의 처음 500자만 잘라냅니다.
+        //        Swift의 String(prefix: 500)에 대응합니다.
+        Log.d(TAG, "responseData: ${dataString.take(500)}")
     }
 
     override fun log(error: Throwable) {
@@ -270,9 +274,10 @@ class DefaultNetworkErrorLogger : NetworkErrorLogger {
     }
 }
 
-/**
- * NetworkError extensions
- */
+// ==================== NetworkError Extensions ====================
+
+// [개념] 확장 프로퍼티로 404 체크 유틸리티를 추가합니다.
+//        Swift의 extension NetworkError { var isNotFoundError: Bool }에 대응합니다.
 val NetworkError.isNotFoundError: Boolean
     get() = hasStatusCode(404)
 

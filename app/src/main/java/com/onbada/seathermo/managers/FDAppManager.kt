@@ -66,17 +66,16 @@ class FDAppManager private constructor() {
     // ==================== 초기화 ====================
 
     /**
-     * 앱 초기화
-     * App Initialization
+     * 앱 초기화.
      *
-     * iOS의 appInitialize()에 대응
-     * 기본 디렉토리 생성 등 초기 설정 수행
+     * iOS의 appInitialize()에 대응합니다.
      *
-     * @param context Application Context
+     * @param context Application Context.
+     *                [개념] Android의 Context는 앱 환경 정보(파일 경로, 리소스 등)에 접근하는 핵심 객체입니다.
+     *                Swift에는 대응 개념이 없으며, iOS에서는 번들/파일 시스템에 직접 접근합니다.
      */
     fun appInitialize(context: Context) {
-        // 기본 디렉토리 생성
-        FDFileManager.getInstance(context).createDefaultDirectories()
+        // TODO: 초기화 로직 추가 예정
     }
 
     /**

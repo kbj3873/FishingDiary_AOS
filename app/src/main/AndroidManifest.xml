@@ -41,43 +41,21 @@
             android:name="com.kakao.sdk.AppKey"
             android:value="${KAKAO_APP_KEY}" />
 
+        <!-- [수정] MainActivity를 LAUNCHER로 설정하여 Compose 화면을 시작합니다. -->
         <activity
-            android:name=".presentation.main.MainHomeActivity"
-            android:exported="true">
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.SeaThermo">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- Ocean Select Activity -->
-        <activity
-            android:name=".presentation.main.OceanSelectActivity"
-            android:exported="false" />
-
-        <!-- Sea Water Temperature Activity -->
-        <activity
-            android:name=".presentation.seawatertemperature.SeaWaterTemperatureActivity"
-            android:exported="false" />
-
-        <!-- Point Map Activity -->
-        <activity
-            android:name=".presentation.point.PointMapActivity"
-            android:exported="false" />
-
-        <!-- Point Selection Activities -->
-        <activity
-            android:name=".presentation.point.list.PointDateListActivity"
-            android:exported="false" />
-        <activity
-            android:name=".presentation.point.list.PointDataListActivity"
-            android:exported="false" />
-
-        <!-- Track Map Activity -->
-        <activity
-            android:name=".presentation.track.TrackMapActivity"
-            android:exported="false" />
+        <!-- [삭제 예정 레거시] 
+             현재 프로젝트 구조상 존재하지 않거나 Compose로 대체될 예정인 레거시 Activity들입니다. 
+             크래시 방지를 위해 선언만 남겨두거나 필요한 경우 삭제합니다.
+        -->
 
         <!-- Location Tracking Foreground Service -->
         <service

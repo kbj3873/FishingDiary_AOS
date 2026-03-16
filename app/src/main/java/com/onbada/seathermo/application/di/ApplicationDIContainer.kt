@@ -1,7 +1,14 @@
 package com.onbada.seathermo.application.di
 
 import android.content.Context
+import androidx.lifecycle.ViewModelProvider
 import com.onbada.seathermo.application.AppConfiguration
+import com.onbada.seathermo.presentation.currenttemperature.viewmodel.CrawlingCurrentTemperatureViewModel
+import com.onbada.seathermo.presentation.currenttemperature.viewmodel.CrawlingOceanSelectViewModel
+import com.onbada.seathermo.presentation.currenttemperature.viewmodel.CurrentTemperatureViewModel
+import com.onbada.seathermo.presentation.currenttemperature.viewmodel.OceanSelectViewModel
+import com.onbada.seathermo.presentation.onboarding.viewmodel.OnboardingViewModel
+import com.onbada.seathermo.presentation.splash.viewmodel.SplashViewModel
 import com.onbada.seathermo.data.repository.DefaultFishingRecordRepository
 import com.onbada.seathermo.data.repository.DefaultOceanRepository
 import com.onbada.seathermo.data.repository.DefaultSplashRepository
@@ -76,17 +83,48 @@ class ApplicationDIContainer(private val context: Context) {
     //
     // iOS의 extension ApplicationDIContainer - make view model 섹션에 대응합니다.
     //
-    // 예시:
-    // fun makeCurrentTemperatureViewModel(): CurrentTemperatureViewModel {
-    //     return CurrentTemperatureViewModel(
-    //         appConfiguration = appConfiguration,
-    //         oceanUseCase = makeOceanUseCase()
-    //     )
-    // }
     //
-    // fun makeSplashViewModel(): SplashViewModel {
-    //     return SplashViewModel(splashUseCase = makeSplashUseCase())
-    // }
+    fun makeCurrentTemperatureViewModelFactory(): ViewModelProvider.Factory {
+        return CurrentTemperatureViewModel.provideFactory(
+            application = context.applicationContext as android.app.Application,
+            appConfiguration = appConfiguration,
+            oceanUseCase = makeOceanUseCase()
+        )
+    }
+
+    fun makeCrawlingCurrentTemperatureViewModelFactory(): ViewModelProvider.Factory {
+        return CrawlingCurrentTemperatureViewModel.provideFactory(
+            application = context.applicationContext as android.app.Application,
+            oceanUseCase = makeOceanUseCase()
+        )
+    }
+
+    fun makeOceanSelectViewModelFactory(): ViewModelProvider.Factory {
+        return OceanSelectViewModel.provideFactory(
+            application = context.applicationContext as android.app.Application,
+            appConfiguration = appConfiguration,
+            oceanUseCase = makeOceanUseCase()
+        )
+    }
+
+    fun makeCrawlingOceanSelectViewModelFactory(): ViewModelProvider.Factory {
+        return CrawlingOceanSelectViewModel.provideFactory(
+            application = context.applicationContext as android.app.Application
+        )
+    }
+
+    fun makeSplashViewModelFactory(): ViewModelProvider.Factory {
+        return SplashViewModel.provideFactory(
+            application = context.applicationContext as android.app.Application,
+            splashUseCase = makeSplashUseCase()
+        )
+    }
+    fun makeOnboardingViewModelFactory(): ViewModelProvider.Factory {
+        return OnboardingViewModel.provideFactory(
+            application = context.applicationContext as android.app.Application
+        )
+    }
+
     //
     // fun makeFishingRecordViewModel(): FishingRecordViewModel {
     //     return FishingRecordViewModel(useCase = makeFishingRecordUseCase())

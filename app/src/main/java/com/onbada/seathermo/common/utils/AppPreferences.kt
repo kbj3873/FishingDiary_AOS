@@ -9,20 +9,20 @@ import com.google.gson.reflect.TypeToken
  * SharedPreferences 유틸리티 클래스
  * SharedPreferences Utility Class
  *
- * iOS의 FDUserDefaults와 동일한 역할
+ * iOS의 FDUserDefaults와 편의상 대응되는 역할
  * - UserDefaults.standard -> SharedPreferences
  * - Codable -> Gson (JSON 직렬화/역직렬화)
  *
  * 사용 예시:
  * ```kotlin
  * // 리스트 저장
- * FDUserDefaults.setToList(context, oceanStations, UserDefaultKey.REGIONAL_SEA_TEMPERATURE_LIST)
+ * AppPreferences.setToList(context, oceanStations, PreferenceConstants.REGIONAL_SEA_TEMPERATURE_LIST)
  *
  * // 리스트 불러오기
- * val stations = FDUserDefaults.getFromList<OceanStationModel>(context, UserDefaultKey.REGIONAL_SEA_TEMPERATURE_LIST)
+ * val stations = AppPreferences.getFromList<OceanStationModel>(context, PreferenceConstants.REGIONAL_SEA_TEMPERATURE_LIST)
  * ```
  */
-object FDUserDefaults {
+object AppPreferences {
 
     private const val PREFERENCE_NAME = "SeaThermoPreferences"
 
@@ -181,10 +181,27 @@ object FDUserDefaults {
  *
  * iOS의 UserDefaultKey와 동일한 역할
  */
-object UserDefaultKey {
+object PreferenceConstants {
     /**
      * 메인화면 노출되는 수온 지역 리스트
      * Regional sea temperature list displayed on main screen
      */
     const val REGIONAL_SEA_TEMPERATURE_LIST = "regionalSeaTempuratureList"
+
+    /**
+     * 크롤링 즐겨찾기 지역 리스트
+     * Crawling favorite regions list
+     */
+    const val CRAWLING_FAVORITE_REGIONS = "crawlingFavoriteRegions"
+
+    /**
+     * 모든 지역 목록 (선택 화면용)
+     */
+    const val ALL_REGION_LIST = "allRegionList"
+
+    /**
+     * 온보딩 완료 여부
+     * Whether the onboarding process has been completed
+     */
+    const val HAS_COMPLETED_ONBOARDING = "hasCompletedOnboarding"
 }

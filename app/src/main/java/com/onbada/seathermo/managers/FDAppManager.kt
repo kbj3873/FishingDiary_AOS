@@ -50,6 +50,23 @@ class FDAppManager private constructor() {
          * Below this velocity is considered as a point area
          */
         const val POINT_VELOCITY: Float = 2 * KMH_KNOT  // 약 3.7 km/h
+
+        // [추가] 낚시 상태 판별을 위한 속도 임계값 (knots)
+        const val SPEED_THRESHOLD_HIGH = 3.0 // 3노트 이상: 이동 중 (Moving)
+        const val SPEED_THRESHOLD_LOW = 0.5  // 0.5~3노트: 탐색 중 (Drifting)
+        // 0.5노트 미만: 낚시 중 (Fishing)
+    }
+
+    /**
+     * 낚시 상태 정의
+     * Fishing State Definition
+     *
+     * iOS의 FDAppManager.FishingState에 대응
+     */
+    enum class FishingState(val description: String, val value: Int) {
+        MOVING("이동 중", 0),
+        DRIFTING("탐색 중", 1),
+        FISHING("낚시 중", 2)
     }
 
     // ==================== 속성 ====================

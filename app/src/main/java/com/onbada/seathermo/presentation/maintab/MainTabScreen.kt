@@ -111,11 +111,12 @@ fun MainTabScreen() {
  * 탭 메뉴 항목을 정의하는 클래스.
  */
 sealed class TabItem(val title: String, val iconResId: Int) {
-    object CurrentTemperature : TabItem("현재수온", com.onbada.seathermo.R.mipmap.ic_launcher_foreground) // 임시 아이콘
-    object Analysis : TabItem("수온분석", com.onbada.seathermo.R.mipmap.ic_launcher_foreground)
-    object FishingRecord : TabItem("낚시기록", com.onbada.seathermo.R.mipmap.ic_launcher_foreground)
-    object History : TabItem("히스토리", com.onbada.seathermo.R.mipmap.ic_launcher_foreground)
-    object Settings : TabItem("설정", com.onbada.seathermo.R.mipmap.ic_launcher_foreground)
+    // [주의] Compose의 painterResource()는 mipmap을 지원하지 않습니다. drawable만 사용 가능합니다.
+    object CurrentTemperature : TabItem("현재수온", com.onbada.seathermo.R.drawable.ic_launcher_foreground) // 임시 아이콘
+    object Analysis : TabItem("수온분석", com.onbada.seathermo.R.drawable.ic_launcher_foreground)
+    object FishingRecord : TabItem("낚시기록", com.onbada.seathermo.R.drawable.ic_launcher_foreground)
+    object History : TabItem("히스토리", com.onbada.seathermo.R.drawable.ic_launcher_foreground)
+    object Settings : TabItem("설정", com.onbada.seathermo.R.drawable.ic_launcher_foreground)
 }
 
 /**

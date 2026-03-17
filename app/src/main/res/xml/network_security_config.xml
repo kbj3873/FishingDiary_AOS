@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    네트워크 보안 설정 파일.
+
+    [개념] Android 9(API 28)부터 기본적으로 HTTP(평문) 통신을 차단합니다.
+           iOS의 NSAppTransportSecurity(Info.plist)에 대응합니다.
+
+    [현재 설정] 온바다 서버가 HTTP를 사용하는 동안 임시로 cleartext를 허용합니다.
+               서버가 HTTPS로 전환되면 이 설정은 제거해야 합니다.
+
+    [참고] iOS의 NSAllowsArbitraryLoads = YES에 해당하는 Android 설정입니다.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

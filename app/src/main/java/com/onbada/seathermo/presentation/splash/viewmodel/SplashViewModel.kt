@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 
 sealed class SplashState {
     object Loading : SplashState()
@@ -59,37 +60,44 @@ class SplashViewModel(
         }
 
         viewModelScope.launch {
-            // 최소 표시 시간 보장 및 병렬 API 호출
-            // [개념] async는 결과를 반환하는 코루틴 빌더로, 여러 작업을 동시에 실행할 때 사용됩니다.
-            //        반환된 Deferred 객체에 대해 await()를 호출하여 결과를 가져옵니다.
-            val versionResultDeferred = async { splashUseCase.checkVersion(appVersion = currentVersion) }
-            val delayDeferred = async { delay(minimumDisplayDuration) }
+            // [개념] supervisorScope는 자식 코루틴의 실패가 부모 Job으로 전파되는 것을 차단합니다.
+            //        async { }는 기본적으로 예외 발생 시 부모 launch Job까지 실패시키는데,
+            //        supervisorScope 안에 넣으면 Deferred에만 예외가 저장되어
+            //        await()를 감싸는 try-catch에서 올바르게 잡을 수 있습니다.
+            //        Swift는 Task 간 예외가 자동 격리되므로 이 처리가 불필요합니다.
+            supervisorScope {
+                // 최소 표시 시간 보장 및 병렬 API 호출
+                // [개념] async는 결과를 반환하는 코루틴 빌더로, 여러 작업을 동시에 실행할 때 사용됩니다.
+                //        반환된 Deferred 객체에 대해 await()를 호출하여 결과를 가져옵니다.
+                val versionResultDeferred = async { splashUseCase.checkVersion(appVersion = currentVersion) }
+                val delayDeferred = async { delay(minimumDisplayDuration) }
 
-            // 관측소 목록은 버전 체크와 독립적으로 저장 (버전 체크 실패 시에도 캐싱)
-            try {
-                val regions = splashUseCase.fetchRegions()
-                AppPreferences.setToList(context, regions, PreferenceConstants.REGIONAL_SEA_TEMPERATURE_LIST)
-                println("[Splash] 관측소 목록 캐싱 완료: ${regions.size}개")
-            } catch (e: Exception) {
-                println("[Splash] 관측소 목록 fetch 실패: ${e.message}")
-            }
+                // 관측소 목록은 버전 체크와 독립적으로 저장 (버전 체크 실패 시에도 캐싱)
+                try {
+                    val regions = splashUseCase.fetchRegions()
+                    AppPreferences.setToList(context, regions, PreferenceConstants.REGIONAL_SEA_TEMPERATURE_LIST)
+                    println("[Splash] 관측소 목록 캐싱 완료: ${regions.size}개")
+                } catch (e: Exception) {
+                    println("[Splash] 관측소 목록 fetch 실패: ${e.message}")
+                }
 
-            try {
-                val status = versionResultDeferred.await()
-                delayDeferred.await()
+                try {
+                    val status = versionResultDeferred.await()
+                    delayDeferred.await()
 
-                if (status.forceUpdate) {
-                    _state.value = SplashState.ForceUpdate(message = status.message)
-                } else if (status.needUpdate) {
-                    _state.value = SplashState.OptionalUpdate(message = status.message)
-                } else {
+                    if (status.forceUpdate) {
+                        _state.value = SplashState.ForceUpdate(message = status.message)
+                    } else if (status.needUpdate) {
+                        _state.value = SplashState.OptionalUpdate(message = status.message)
+                    } else {
+                        _state.value = SplashState.ReadyToNavigate
+                    }
+                } catch (e: Exception) {
+                    delayDeferred.await()
+                    // 버전 체크 실패 시 조용히 메인 화면으로 전환
+                    println("[Splash] 버전 체크 실패: ${e.message}")
                     _state.value = SplashState.ReadyToNavigate
                 }
-            } catch (e: Exception) {
-                delayDeferred.await()
-                // 버전 체크 실패 시 조용히 메인 화면으로 전환
-                println("[Splash] 버전 체크 실패: ${e.message}")
-                _state.value = SplashState.ReadyToNavigate
             }
         }
     }

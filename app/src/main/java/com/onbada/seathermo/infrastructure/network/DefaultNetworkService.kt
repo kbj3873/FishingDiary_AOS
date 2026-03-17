@@ -4,7 +4,11 @@ import android.util.Log
 import com.onbada.seathermo.BuildConfig
 import okhttp3.*
 import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.nio.charset.Charset
+import javax.net.ssl.SSLException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -128,8 +132,9 @@ class DefaultNetworkService(
 
             call.enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
+                    // 원본 IOException을 먼저 로그로 남겨 실제 원인을 파악합니다.
+                    logger.log(e)
                     val networkError = resolveError(e)
-                    logger.log(networkError)
                     continuation.resumeWithException(networkError)
                 }
 
@@ -151,8 +156,8 @@ class DefaultNetworkService(
                         return
                     }
 
-                    // EUC-KR → UTF-8 변환 (NIFS 웹사이트 대응)
-                    val resolvedData = resolveData(data)
+                    // EUC-KR → UTF-8 변환 (NIFS 웹사이트 대응 — Content-Type에 euc-kr이 있을 때만 적용)
+                    val resolvedData = resolveData(data, response)
                     logger.log(resolvedData, response)
                     continuation.resume(resolvedData)
                 }
@@ -175,6 +180,18 @@ class DefaultNetworkService(
         return when {
             error is IOException && error.message?.contains("canceled") == true ->
                 NetworkError.Cancelled
+            error is UnknownHostException ->
+                // DNS 해석 실패 — 호스트를 찾을 수 없음 (잘못된 URL이거나 인터넷 미연결)
+                NetworkError.NotConnected
+            error is ConnectException ->
+                // 서버에 연결 자체를 거부당함 (포트 오류, 서버 다운 등)
+                NetworkError.NotConnected
+            error is SocketTimeoutException ->
+                // 응답 시간 초과
+                NetworkError.Generic(error)
+            error is SSLException ->
+                // SSL/TLS 인증서 오류 (HTTP URL을 HTTPS로 요청하거나 인증서 불일치)
+                NetworkError.Generic(error)
             error is IOException ->
                 NetworkError.NotConnected
             else ->
@@ -183,11 +200,17 @@ class DefaultNetworkService(
     }
 
     /**
-     * EUC-KR 인코딩된 데이터를 UTF-8로 변환합니다.
+     * 필요한 경우 EUC-KR 인코딩된 데이터를 UTF-8로 변환합니다.
      *
-     * www.nifs.go.kr API 일부는 EUC-KR로 응답하므로 UTF-8로 재인코딩합니다.
+     * [개념] Content-Type 헤더의 charset을 확인하여 EUC-KR일 때만 변환합니다.
+     *        JSON API(온바다 서버)는 이미 UTF-8이므로 변환하지 않습니다.
+     *        NIFS 웹사이트는 EUC-KR로 응답하므로 변환이 필요합니다.
      */
-    private fun resolveData(data: ByteArray): ByteArray {
+    private fun resolveData(data: ByteArray, response: Response): ByteArray {
+        val contentType = response.header("Content-Type") ?: ""
+        val isEucKr = contentType.contains("euc-kr", ignoreCase = true)
+        if (!isEucKr) return data
+
         return try {
             val eucKrString = String(data, eucKrCharset)
             eucKrString.toByteArray(Charsets.UTF_8)
@@ -263,10 +286,22 @@ class DefaultNetworkErrorLogger : NetworkErrorLogger {
 
     override fun log(responseData: ByteArray?, response: Response?) {
         if (!BuildConfig.DEBUG || responseData == null) return
-        val dataString = String(responseData, Charsets.UTF_8)
-        // [개념] take(500)은 문자열의 처음 500자만 잘라냅니다.
-        //        Swift의 String(prefix: 500)에 대응합니다.
-        Log.d(TAG, "responseData: ${dataString.take(500)}")
+        val raw = String(responseData, Charsets.UTF_8)
+
+        // JSON Pretty Print: Gson으로 파싱 후 들여쓰기 포맷으로 재직렬화합니다.
+        // [개념] runCatching은 try-catch를 함수형으로 표현합니다. 파싱 실패 시 원본 문자열을 사용합니다.
+        val pretty = runCatching {
+            val json = com.google.gson.Gson().fromJson(raw, Any::class.java)
+            com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(json)
+        }.getOrDefault(raw)
+
+        // Android Logcat은 한 번에 ~4000자까지만 출력합니다.
+        // [개념] chunked(3000)은 문자열을 3000자 단위로 잘라 리스트로 반환합니다.
+        //        각 청크를 별도 Log.d로 출력하여 전체 내용을 확인할 수 있습니다.
+        Log.d(TAG, "responseData ↓")
+        pretty.chunked(3000).forEachIndexed { index, chunk ->
+            Log.d(TAG, "[$index] $chunk")
+        }
     }
 
     override fun log(error: Throwable) {

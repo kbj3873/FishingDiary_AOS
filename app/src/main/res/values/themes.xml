@@ -6,4 +6,26 @@
     </style>
 
     <style name="Theme.SeaThermo" parent="Base.Theme.SeaThermo" />
+
+    <!--
+        앱 콜드 스타트 전용 테마 — Android SplashScreen API 기반.
+        iOS의 LaunchScreen.storyboard에 대응합니다.
+
+        [동작 방식]
+        - Android 12+ : 시스템 네이티브 Splash Screen에 background/icon을 직접 적용
+        - Android 12 미만 : windowBackground 방식으로 폴백
+        - Compose 로딩 후 postSplashScreenTheme(Theme.SeaThermo)으로 자동 전환
+
+        [주의] MainActivity에서 반드시 installSplashScreen()을 setContent 이전에 호출해야 합니다.
+    -->
+    <style name="Theme.SeaThermo.Starting" parent="Theme.SplashScreen">
+        <!-- 배경: 흰색 -->
+        <item name="windowSplashScreenBackground">#FFFFFF</item>
+        <!-- 아이콘: 배경 포함 앱 아이콘 -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <!-- 아이콘 뒤 시스템 배경원 제거 -->
+        <item name="windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+        <!-- Splash 종료 후 전환할 테마 -->
+        <item name="postSplashScreenTheme">@style/Theme.SeaThermo</item>
+    </style>
 </resources>

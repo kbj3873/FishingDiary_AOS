@@ -13,3 +13,5 @@
 .externalNativeBuild
 .cxx
 local.properties
+.swagger-cache/
+.claude/settings.local.json

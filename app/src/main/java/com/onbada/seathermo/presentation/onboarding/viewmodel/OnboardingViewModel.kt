@@ -26,6 +26,16 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
     val totalPages = 4
 
     /**
+     * 특정 페이지로 직접 이동 (HorizontalPager 스와이프 동기화용)
+     *
+     * [개념] Compose의 HorizontalPager가 스와이프로 페이지를 변경하면
+     *        ViewModel의 currentPage도 동기화해야 마지막 페이지 판별이 정확해집니다.
+     */
+    fun setCurrentPage(page: Int) {
+        _currentPage.value = page
+    }
+
+    /**
      * 다음 페이지로 이동하거나, 마지막 페이지면 온보딩 완료 처리
      *
      * [개념] 고차 함수(Higher-Order Function) 파라미터 onComplete: () -> Unit을 사용하여,

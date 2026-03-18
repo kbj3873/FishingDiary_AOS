@@ -4,10 +4,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,8 +21,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.onbada.seathermo.R
+
+// 탭 활성/비활성 색상 — iOS MainTabView.swift의 accentColor(#2563EB), 비활성(#8E8E93)과 동일
+private val TabActiveColor = Color(0xFF2563EB)
+private val TabInactiveColor = Color(0xFF8E8E93)
+
+// 탭바 배경: Figma 기준 rgba(255,255,255,0.8) = #CCFFFFFF
+private val TabBarBackgroundColor = Color(0xCCFFFFFF)
+
+// 탭바 상단 구분선: Figma 기준 rgba(0,0,0,0.1) = #1A000000
+private val TabBarDividerColor = Color(0x1A000000)
 
 /**
  * 앱의 메인 하단 탭 화면.
@@ -36,7 +50,6 @@ fun MainTabScreen() {
     //        값을 유지하는 상태 변수입니다. Swift의 @State와 동일합니다.
     var selectedTabIndex by remember { mutableIntStateOf(0) }
 
-    // 탭 메뉴 항목 정의
     val tabItems = listOf(
         TabItem.CurrentTemperature,
         TabItem.Analysis,
@@ -48,30 +61,57 @@ fun MainTabScreen() {
     // [개념] Scaffold는 앱의 표준 UI 구조(상단바, 하단바 등)를 쉽게 배치할 수 있는 레이아웃 틀입니다.
     Scaffold(
         bottomBar = {
-            // [개념] NavigationBar는 하단 탭 바 컴포넌트입니다.
-            NavigationBar(
-                containerColor = Color.White,
-                tonalElevation = 8.dp // 상단 경계 구분을 위한 고도 효과
-            ) {
-                tabItems.forEachIndexed { index, item ->
-                    // [개념] NavigationBarItem은 개별 탭 버튼입니다.
-                    NavigationBarItem(
-                        selected = selectedTabIndex == index,
-                        onClick = { selectedTabIndex = index },
-                        icon = {
-                            Icon(
-                                painter = painterResource(id = item.iconResId),
-                                contentDescription = item.title,
-                                tint = if (selectedTabIndex == index) Color(0xFF2563EB) else Color(0xFF8E8E93)
-                            )
-                        },
-                        label = {
-                            Text(
-                                text = item.title,
-                                color = if (selectedTabIndex == index) Color(0xFF2563EB) else Color(0xFF8E8E93)
-                            )
-                        }
-                    )
+            // 상단 구분선 + NavigationBar를 Column으로 묶어
+            // Figma의 border-t 효과를 구현합니다.
+            Column {
+                // Figma: border-t-[0.909px] rgba(0,0,0,0.1)
+                HorizontalDivider(
+                    thickness = 1.dp,
+                    color = TabBarDividerColor
+                )
+                // [개념] NavigationBar는 Material3의 하단 탭 바 컴포넌트입니다.
+                //        tonalElevation = 0.dp 로 Material3 기본 색조 오버레이를 제거합니다.
+                NavigationBar(
+                    containerColor = TabBarBackgroundColor,
+                    tonalElevation = 0.dp
+                ) {
+                    tabItems.forEachIndexed { index, item ->
+                        val isSelected = selectedTabIndex == index
+
+                        // [개념] NavigationBarItem은 개별 탭 버튼입니다.
+                        //        NavigationBarItemDefaults.colors()로 활성/비활성 색상을 지정하고
+                        //        indicatorColor = Transparent 으로 선택 시 나타나는 pill 배경을 제거합니다.
+                        NavigationBarItem(
+                            selected = isSelected,
+                            onClick = { selectedTabIndex = index },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = TabActiveColor,
+                                selectedTextColor = TabActiveColor,
+                                unselectedIconColor = TabInactiveColor,
+                                unselectedTextColor = TabInactiveColor,
+                                // Figma 디자인에 pill(선택 배경 원형) 없음 → 투명 처리
+                                indicatorColor = Color.Transparent
+                            ),
+                            icon = {
+                                // [개념] painterResource()로 Vector Drawable을 불러옵니다.
+                                //        tint는 NavigationBarItemDefaults.colors()가 자동 적용합니다.
+                                Icon(
+                                    painter = painterResource(id = item.iconResId),
+                                    contentDescription = item.title
+                                )
+                            },
+                            label = {
+                                // Figma: 10sp, Regular, letterSpacing 0.12sp
+                                Text(
+                                    text = item.title,
+                                    style = TextStyle(
+                                        fontSize = 10.sp,
+                                        letterSpacing = 0.12.sp
+                                    )
+                                )
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -82,41 +122,28 @@ fun MainTabScreen() {
             // [개념] when 절을 통해 선택된 인덱스에 맞는 Composable을 노출합니다.
             //        Swift의 switch case 문과 동일한 제어문입니다.
             when (tabItems[selectedTabIndex]) {
-                TabItem.CurrentTemperature -> {
-                    // TODO: CurrentTemperatureScreen 구현 후 연결
-                    PlaceholderScreen("현재수온")
-                }
-                TabItem.Analysis -> {
-                    // TODO: SeaAnalysisScreen 구현 후 연결
-                    PlaceholderScreen("수온분석")
-                }
-                TabItem.FishingRecord -> {
-                    // TODO: FishingRecordScreen 구현 후 연결
-                    PlaceholderScreen("낚시기록")
-                }
-                TabItem.History -> {
-                    // TODO: HistoryScreen 구현 후 연결
-                    PlaceholderScreen("히스토리")
-                }
-                TabItem.Settings -> {
-                    // TODO: SettingScreen 구현 후 연결
-                    PlaceholderScreen("설정")
-                }
+                TabItem.CurrentTemperature -> PlaceholderScreen("현재수온")  // TODO: CurrentTemperatureScreen
+                TabItem.Analysis -> PlaceholderScreen("수온분석")             // TODO: SeaAnalysisScreen
+                TabItem.FishingRecord -> PlaceholderScreen("낚시기록")        // TODO: FishingRecordScreen
+                TabItem.History -> PlaceholderScreen("히스토리")              // TODO: HistoryScreen
+                TabItem.Settings -> PlaceholderScreen("설정")                 // TODO: SettingScreen
             }
         }
     }
 }
 
 /**
- * 탭 메뉴 항목을 정의하는 클래스.
+ * 탭 메뉴 항목을 정의하는 sealed class.
+ *
+ * [개념] sealed class는 정해진 하위 타입만 가질 수 있는 제한된 클래스 계층입니다.
+ *        Swift의 enum과 유사하지만 각 케이스가 독립적인 object/class가 될 수 있습니다.
  */
 sealed class TabItem(val title: String, val iconResId: Int) {
-    // [주의] Compose의 painterResource()는 mipmap을 지원하지 않습니다. drawable만 사용 가능합니다.
-    object CurrentTemperature : TabItem("현재수온", com.onbada.seathermo.R.drawable.ic_launcher_foreground) // 임시 아이콘
-    object Analysis : TabItem("수온분석", com.onbada.seathermo.R.drawable.ic_launcher_foreground)
-    object FishingRecord : TabItem("낚시기록", com.onbada.seathermo.R.drawable.ic_launcher_foreground)
-    object History : TabItem("히스토리", com.onbada.seathermo.R.drawable.ic_launcher_foreground)
-    object Settings : TabItem("설정", com.onbada.seathermo.R.drawable.ic_launcher_foreground)
+    object CurrentTemperature : TabItem("현재수온", R.drawable.ic_tab_temperature)
+    object Analysis : TabItem("수온분석", R.drawable.ic_tab_analysis)
+    object FishingRecord : TabItem("낚시기록", R.drawable.ic_tab_fishing)
+    object History : TabItem("히스토리", R.drawable.ic_tab_history)
+    object Settings : TabItem("설정", R.drawable.ic_tab_settings)
 }
 
 /**

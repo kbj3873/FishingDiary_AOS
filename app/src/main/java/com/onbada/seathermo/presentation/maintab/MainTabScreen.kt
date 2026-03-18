@@ -29,6 +29,7 @@ import com.onbada.seathermo.R
 import com.onbada.seathermo.application.di.ApplicationDIContainer
 import com.onbada.seathermo.presentation.currenttemperature.screen.CrawlingCurrentTemperatureScreen
 import com.onbada.seathermo.presentation.currenttemperature.viewmodel.CrawlingCurrentTemperatureViewModel
+import com.onbada.seathermo.presentation.seaanalysis.screen.SeaAnalysisScreen
 
 // 탭 활성/비활성 색상 — iOS MainTabView.swift의 accentColor(#2563EB), 비활성(#8E8E93)과 동일
 private val TabActiveColor = Color(0xFF2563EB)
@@ -137,7 +138,7 @@ fun MainTabScreen(diContainer: ApplicationDIContainer) {
                         diContainer = diContainer
                     )
                 }
-                TabItem.Analysis -> PlaceholderScreen("수온분석")             // TODO: SeaAnalysisScreen
+                TabItem.Analysis -> SeaAnalysisScreen()
                 TabItem.FishingRecord -> PlaceholderScreen("낚시기록")        // TODO: FishingRecordScreen
                 TabItem.History -> PlaceholderScreen("히스토리")              // TODO: HistoryScreen
                 TabItem.Settings -> PlaceholderScreen("설정")                 // TODO: SettingScreen

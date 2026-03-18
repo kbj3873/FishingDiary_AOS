@@ -418,19 +418,22 @@ private fun SubTemperatureRow(label: String, value: String) {
         )
     } else {
         // 값 있음 — "중층: " (18sp, white 95%) + 온도값 (18sp SemiBold, white 95%)
+        // [개념] alignByBaseline()을 사용하여 폰트 굵기가 달라도 텍스트의 실제 하단 기준선을 완벽하게 일치시킵니다.
         Row {
             Text(
                 text = "$label: ",
                 fontSize = 18.sp,
                 color = Color.White.copy(alpha = 0.95f),
-                letterSpacing = (-0.44).sp
+                letterSpacing = (-0.44).sp,
+                modifier = Modifier.alignByBaseline()
             )
             Text(
                 text = "$value°",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White.copy(alpha = 0.95f),
-                letterSpacing = (-0.44).sp
+                letterSpacing = (-0.44).sp,
+                modifier = Modifier.alignByBaseline()
             )
         }
     }

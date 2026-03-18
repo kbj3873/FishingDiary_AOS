@@ -122,14 +122,21 @@ object APIEndpoints {
         /**
          * NIFS 웹 크롤링 우회 헤더.
          *
-         * WAF(Web Application Firewall) 우회를 위해 모바일 사파리 User-Agent를 사용합니다.
+         * WAF(Web Application Firewall) 우회를 위해 모바일 브라우저 User-Agent를 사용합니다.
+         * 실제 기기 정보를 동적으로 주입합니다.
          */
         fun forWebCrawling(): Map<String, String> = mapOf(
             "Referer" to "https://www.nifs.go.kr/risa/risa/risaA/actionRisaInfo.do",
             "X-Requested-With" to "XMLHttpRequest",
             "Content-Type" to "application/x-www-form-urlencoded",
-            "User-Agent" to "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+            "User-Agent" to webCrawlingUserAgent
         )
+
+        // [개념] get() = ... 은 매번 호출 시 실제 기기 정보를 읽어 계산합니다.
+        private val webCrawlingUserAgent: String
+            get() = "Mozilla/5.0 (Linux; Android ${Build.VERSION.RELEASE}; ${Build.MODEL}) " +
+                    "AppleWebKit/537.36 (KHTML, like Gecko) " +
+                    "Chrome/120.0.0.0 Mobile Safari/537.36"
 
         /**
          * 온바다 서버 API 공통 헤더.

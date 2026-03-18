@@ -24,7 +24,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.onbada.seathermo.R
+import com.onbada.seathermo.application.di.ApplicationDIContainer
+import com.onbada.seathermo.presentation.currenttemperature.screen.CrawlingCurrentTemperatureScreen
+import com.onbada.seathermo.presentation.currenttemperature.viewmodel.CrawlingCurrentTemperatureViewModel
 
 // 탭 활성/비활성 색상 — iOS MainTabView.swift의 accentColor(#2563EB), 비활성(#8E8E93)과 동일
 private val TabActiveColor = Color(0xFF2563EB)
@@ -44,7 +48,7 @@ private val TabBarDividerColor = Color(0x1A000000)
  *        SwiftUI의 TabView와 동일한 역할을 수행합니다.
  */
 @Composable
-fun MainTabScreen() {
+fun MainTabScreen(diContainer: ApplicationDIContainer) {
     // 현재 선택된 탭 인덱스 상태 관리.
     // [개념] remember { mutableIntStateOf(0) } 는 화면이 다시 그려져도(Recomposition)
     //        값을 유지하는 상태 변수입니다. Swift의 @State와 동일합니다.
@@ -122,7 +126,17 @@ fun MainTabScreen() {
             // [개념] when 절을 통해 선택된 인덱스에 맞는 Composable을 노출합니다.
             //        Swift의 switch case 문과 동일한 제어문입니다.
             when (tabItems[selectedTabIndex]) {
-                TabItem.CurrentTemperature -> PlaceholderScreen("현재수온")  // TODO: CurrentTemperatureScreen
+                TabItem.CurrentTemperature -> {
+                    // [개념] viewModel(factory = ...)은 DI 컨테이너의 팩토리로 ViewModel을 생성합니다.
+                    //        Crawling 버전을 사용합니다: RISA OpenAPI 대신 risaInfo API 병렬 호출 방식.
+                    val crawlingViewModel: CrawlingCurrentTemperatureViewModel = viewModel(
+                        factory = diContainer.makeCrawlingCurrentTemperatureViewModelFactory()
+                    )
+                    CrawlingCurrentTemperatureScreen(
+                        viewModel = crawlingViewModel,
+                        diContainer = diContainer
+                    )
+                }
                 TabItem.Analysis -> PlaceholderScreen("수온분석")             // TODO: SeaAnalysisScreen
                 TabItem.FishingRecord -> PlaceholderScreen("낚시기록")        // TODO: FishingRecordScreen
                 TabItem.History -> PlaceholderScreen("히스토리")              // TODO: HistoryScreen

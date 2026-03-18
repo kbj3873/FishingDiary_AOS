@@ -62,6 +62,14 @@ class CrawlingCurrentTemperatureViewModel(
         fetchStationList()
     }
 
+    /**
+     * OceanSelectSheet 표시 여부를 변경합니다.
+     * iOS의 isOceanSelectPresented @Published var 직접 대입에 대응합니다.
+     */
+    fun setOceanSelectPresented(isPresented: Boolean) {
+        _uiState.update { it.copy(isOceanSelectPresented = isPresented) }
+    }
+
     fun fetchStationList() {
         val context = getApplication<Application>()
         val favoriteRegions = AppPreferences.getFromList<Region>(
@@ -78,7 +86,7 @@ class CrawlingCurrentTemperatureViewModel(
 
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
-            val dateFormat = SimpleDateFormat("yyyyMMdd", Locale.KOREA)
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.KOREA)
             val todayDateString = dateFormat.format(Date())
             
             // [개념] Kotlin Coroutines의 async와 awaitAll은

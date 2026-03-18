@@ -70,6 +70,14 @@ class CurrentTemperatureViewModel(
         fetchStationList()
     }
 
+    /**
+     * OceanSelectSheet 표시 여부를 변경합니다.
+     * iOS의 isOceanSelectPresented @Published var 직접 대입에 대응합니다.
+     */
+    fun setOceanSelectPresented(isPresented: Boolean) {
+        _uiState.update { it.copy(isOceanSelectPresented = isPresented) }
+    }
+
     fun fetchStationList() {
         _uiState.update { it.copy(isLoading = true, errorMessage = null, showErrorAlert = false) }
 

@@ -140,11 +140,16 @@ data class Endpoint<R>(
         }
 
         // Body 설정
+        // [개념] iOS의 urlRequest()는 httpBody를 직접 설정하고 Content-Type은 헤더에서만 관리합니다.
+        //        OkHttp의 toRequestBody(mediaType)은 mediaType을 Content-Type 헤더로 자동 추가하므로
+        //        headerParameters에 설정된 Content-Type과 충돌하거나 덮어쓸 수 있습니다.
+        //        따라서 mediaType을 하드코딩하지 않고 headerParameters의 Content-Type을 사용합니다.
         if (bodyParameters.isNotEmpty()) {
             val bodyData = bodyEncoder.encode(bodyParameters)
             if (bodyData != null) {
-                val mediaType = "application/json; charset=utf-8".toMediaType()
-                requestBuilder.method(method.value, bodyData.toRequestBody(mediaType))
+                val contentType = (headerParameters["Content-Type"] ?: "application/json; charset=utf-8")
+                    .toMediaType()
+                requestBuilder.method(method.value, bodyData.toRequestBody(contentType))
             }
         } else {
             // [개념] GET/HEAD/DELETE는 body 없이, POST/PUT/PATCH는 빈 body로 전송합니다.

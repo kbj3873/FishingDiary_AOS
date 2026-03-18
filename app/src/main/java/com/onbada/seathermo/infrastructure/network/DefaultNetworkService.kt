@@ -280,8 +280,22 @@ class DefaultNetworkErrorLogger : NetworkErrorLogger {
         if (!BuildConfig.DEBUG) return
         Log.d(TAG, "-------------")
         Log.d(TAG, "request: ${request.url}")
-        Log.d(TAG, "headers: ${request.headers}")
         Log.d(TAG, "method: ${request.method}")
+        Log.d(TAG, "headers: ${request.headers}")
+
+        // request body 로깅 (POST 등 body가 있는 경우)
+        val body = request.body
+        if (body != null) {
+            try {
+                val buffer = okio.Buffer()
+                body.writeTo(buffer)
+                Log.d(TAG, "body: ${buffer.readUtf8()}")
+            } catch (e: Exception) {
+                Log.d(TAG, "body: (read failed) ${e.message}")
+            }
+        } else {
+            Log.d(TAG, "body: (none)")
+        }
     }
 
     override fun log(responseData: ByteArray?, response: Response?) {

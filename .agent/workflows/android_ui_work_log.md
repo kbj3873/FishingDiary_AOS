@@ -15,6 +15,22 @@
 
 ---
 
+## ⚡ Crawling / OpenAPI 쌍(Pair) 구현 원칙
+
+`CurrentTemperature` 관련 화면은 **동일한 UI를 공유하는 두 세트**로 구성됩니다.
+
+| Crawling 버전 | OpenAPI 버전 | 차이점 |
+|--------------|-------------|--------|
+| `CrawlingCurrentTemperatureScreen.kt` | `CurrentTemperatureScreen.kt` | 데이터 소스만 다름 |
+| `CrawlingOceanSelectScreen.kt` | `OceanSelectScreen.kt` | 데이터 소스만 다름 |
+| `CrawlingCurrentTemperatureViewModel` | `CurrentTemperatureViewModel` | 역할 동일, API 호출 방식 다름 |
+| `CrawlingOceanSelectViewModel` | `OceanSelectViewModel` | 역할 동일, API 호출 방식 다름 |
+
+**규칙:** UI 변경 사항은 반드시 **두 세트에 동일하게 적용**해야 합니다.
+현재는 **크롤링 버전 기준으로 구현** 중입니다.
+
+---
+
 ## 🗺️ 전체 구현 순서
 
 ```
@@ -52,7 +68,9 @@
 | `SplashScreen.kt` | ✅ 완성 | |
 | `OnboardingScreen.kt` | ✅ 완성 | |
 | `MainTabScreen.kt` | 🟡 골격만 (Placeholder) | **현재 작업** — 탭 아이콘 연결 필요 |
-| `CurrentTemperatureScreen.kt` | 🔴 미구현 | |
+| `CrawlingCurrentTemperatureScreen.kt` | 🟡 진행중 | 카드 섹션 구현 완료, OceanSelect Sheet 연결 완료 |
+| `CurrentTemperatureScreen.kt` | 🟡 진행중 | 카드 섹션 구현 완료, OceanSelect Sheet 연결 완료 |
+| `CrawlingOceanSelectScreen.kt` | 🔴 미구현 | |
 | `OceanSelectScreen.kt` | 🔴 미구현 | |
 | `SeaAnalysisScreen.kt` | 🔴 미구현 | |
 | `SeaAnalysisDetailScreen.kt` | 🔴 미구현 | |

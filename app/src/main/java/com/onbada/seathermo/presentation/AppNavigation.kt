@@ -91,7 +91,7 @@ fun AppNavigation(diContainer: ApplicationDIContainer) {
 
         // ── Main (BottomTab) ─────────────────────────────────────────────────
         composable("main") {
-            MainTabScreen()
+            MainTabScreen(diContainer = diContainer)
         }
     }
 }

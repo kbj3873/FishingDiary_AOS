@@ -22,7 +22,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.onbada.seathermo.R
+import com.onbada.seathermo.application.di.ApplicationDIContainer
 import com.onbada.seathermo.common.utils.AppPreferences
 import com.onbada.seathermo.common.utils.PreferenceConstants
 import com.onbada.seathermo.domain.entity.Region
@@ -46,10 +50,25 @@ import com.onbada.seathermo.domain.entity.Sea
  *
  * [개념] 이 화면은 ViewModel을 사용하지 않고 AppPreferences에서 직접 데이터를 읽어와 구성합니다.
  *        iOS의 SeaAnalysisView.swift 로직을 그대로 이식했습니다.
+ *
+ * @param diContainer ViewModel factory 제공을 위한 DI 컨테이너
+ * @param onNavigateToDetail 관측소 선택 후 상세 화면으로 이동할 때 호출 (SeaAnalysisDetailScreen 구현 후 연결)
  */
 @Composable
-fun SeaAnalysisScreen() {
+fun SeaAnalysisScreen(
+    diContainer: ApplicationDIContainer,
+    onNavigateToDetail: (seaAreaId: String, stationCode: String) -> Unit = { _, _ -> }
+) {
     val context = LocalContext.current
+
+    // BottomSheet 표시 여부 상태.
+    // [개념] mutableStateOf()는 Compose가 추적하는 상태 변수입니다.
+    //        값이 변경되면 이 상태를 읽는 Composable만 자동으로 재구성(Recomposition)됩니다.
+    //        iOS의 @State var showSheet = false 에 대응합니다.
+    var showRegionSheet by remember { mutableStateOf(false) }
+
+    // 선택된 해역 ID ("W" / "E" / "S").
+    var selectedSeaId by remember { mutableStateOf("") }
 
     // [개념] remember { } 블록 내부에서 데이터를 한 번만 읽어와 성능을 최적화합니다.
     //        iOS의 seaRegions 연산 프로퍼티 로직에 대응합니다.
@@ -109,8 +128,10 @@ fun SeaAnalysisScreen() {
                     SeaRegionCardView(
                         region = region,
                         onClick = {
-                            // TODO: 다음 단계에서 SeaRegionListScreen 연결
-                            println("Selected Sea: ${region.title}")
+                            // 선택된 해역 ID를 저장하고 BottomSheet를 표시합니다.
+                            // iOS: showSheet = true, selectedSea = sea
+                            selectedSeaId = region.id
+                            showRegionSheet = true
                         }
                     )
                 }
@@ -118,6 +139,22 @@ fun SeaAnalysisScreen() {
                 item { Spacer(modifier = Modifier.height(16.dp)) }
             }
         }
+    }
+
+    // ── SeaRegionListScreen (ModalBottomSheet) ──────────────────────────────
+    // [개념] if 조건으로 showRegionSheet 가 true일 때만 BottomSheet를 표시합니다.
+    //        iOS의 .sheet(isPresented: $showSheet) { SeaRegionListView(sea: selectedSea) } 에 대응합니다.
+    if (showRegionSheet) {
+        SeaRegionListScreen(
+            seaAreaId = selectedSeaId,
+            diContainer = diContainer,
+            onDismiss = { showRegionSheet = false },
+            onRegionSelected = { region ->
+                showRegionSheet = false
+                // TODO: SeaAnalysisDetailScreen 구현 후 연결
+                onNavigateToDetail(region.toSea().id, region.regionCode)
+            }
+        )
     }
 }
 
@@ -241,9 +278,10 @@ private fun SeaRegionCardView(
                     letterSpacing = (-0.07).sp
                 )
                 Spacer(modifier = Modifier.width(4.dp))
-                // 화살표 아이콘 (iOS 카드 디자인 참고)
+                // chevron 아이콘: iOS Image(systemName: "chevron.right") 대응
+                // tint = Color.White 로 PNG 원본 색상(#C7C7CC)을 흰색으로 덮습니다.
                 Icon(
-                    painter = painterResource(id = R.drawable.ic_plus), // ic_arrow_right 등이 없으면 우선 ic_plus 사용
+                    painter = painterResource(id = R.drawable.ic_chevron_right),
                     contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier.size(12.dp)

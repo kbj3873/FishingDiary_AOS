@@ -1,6 +1,7 @@
 package com.onbada.seathermo.presentation.seaanalysis.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.onbada.seathermo.common.extensions.DateUtils
 import com.onbada.seathermo.domain.entity.Region
@@ -217,6 +218,25 @@ class SeaAnalysisDetailViewModel(
                 bottomValues = bottomValues,
                 graphDates = graphDates
             )
+        }
+    }
+
+    companion object {
+        /**
+         * OceanUseCase와 Region을 주입받는 커스텀 Factory.
+         *
+         * [개념] ViewModel 생성자에 파라미터를 전달할 때 ViewModelProvider.Factory가 필요합니다.
+         *        SeaRegionListViewModel.provideFactory와 동일한 패턴입니다.
+         *        iOS의 StateObject(wrappedValue: SeaAnalysisDetailViewModel(region:)) 에 대응합니다.
+         */
+        fun provideFactory(
+            oceanUseCase: OceanUseCase,
+            region: Region
+        ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return SeaAnalysisDetailViewModel(oceanUseCase, region) as T
+            }
         }
     }
 }

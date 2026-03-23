@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,11 +50,22 @@ private val TabBarDividerColor = Color(0x1A000000)
  *        SwiftUI의 TabView와 동일한 역할을 수행합니다.
  */
 @Composable
-fun MainTabScreen(diContainer: ApplicationDIContainer) {
+fun MainTabScreen(
+    diContainer: ApplicationDIContainer,
+    // SeaAnalysisDetailScreen으로 이동하는 콜백.
+    // [개념] 콜백 파라미터로 Navigation 의존성을 AppNavigation에 위임합니다.
+    //        MainTabScreen은 navController를 직접 보유하지 않아 결합도를 낮춥니다.
+    //        iOS의 @EnvironmentObject로 전달하는 패턴과 동일한 의도입니다.
+    onNavigateToSeaAnalysisDetail: (stationCode: String) -> Unit = {}
+) {
     // 현재 선택된 탭 인덱스 상태 관리.
     // [개념] remember { mutableIntStateOf(0) } 는 화면이 다시 그려져도(Recomposition)
     //        값을 유지하는 상태 변수입니다. Swift의 @State와 동일합니다.
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    // [개념] rememberSaveable은 remember와 달리 Navigation 백스택 복귀 시에도
+    //        상태를 복원합니다. SeaAnalysisDetailScreen에서 뒤로가기 시
+    //        마지막으로 선택된 탭(수온분석=1)이 유지됩니다.
+    //        iOS의 @State는 뷰가 살아있는 동안 상태를 유지하는 것과 동일한 효과입니다.
+    var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
 
     val tabItems = listOf(
         TabItem.CurrentTemperature,
@@ -138,7 +150,13 @@ fun MainTabScreen(diContainer: ApplicationDIContainer) {
                         diContainer = diContainer
                     )
                 }
-                TabItem.Analysis -> SeaAnalysisScreen()
+                TabItem.Analysis -> SeaAnalysisScreen(
+                    diContainer = diContainer,
+                    onNavigateToDetail = { _, stationCode ->
+                        // seaAreaId는 stationCode로 Region을 조회할 수 있으므로 무시합니다.
+                        onNavigateToSeaAnalysisDetail(stationCode)
+                    }
+                )
                 TabItem.FishingRecord -> PlaceholderScreen("낚시기록")        // TODO: FishingRecordScreen
                 TabItem.History -> PlaceholderScreen("히스토리")              // TODO: HistoryScreen
                 TabItem.Settings -> PlaceholderScreen("설정")                 // TODO: SettingScreen

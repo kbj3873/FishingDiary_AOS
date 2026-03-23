@@ -8,6 +8,9 @@ import com.onbada.seathermo.presentation.currenttemperature.viewmodel.CrawlingOc
 import com.onbada.seathermo.presentation.currenttemperature.viewmodel.CurrentTemperatureViewModel
 import com.onbada.seathermo.presentation.currenttemperature.viewmodel.OceanSelectViewModel
 import com.onbada.seathermo.presentation.onboarding.viewmodel.OnboardingViewModel
+import com.onbada.seathermo.domain.entity.Region
+import com.onbada.seathermo.presentation.seaanalysis.viewmodel.SeaAnalysisDetailViewModel
+import com.onbada.seathermo.presentation.seaanalysis.viewmodel.SeaRegionListViewModel
 import com.onbada.seathermo.presentation.splash.viewmodel.SplashViewModel
 import com.onbada.seathermo.data.repository.DefaultFishingRecordRepository
 import com.onbada.seathermo.data.repository.DefaultOceanRepository
@@ -122,6 +125,20 @@ class ApplicationDIContainer(private val context: Context) {
     fun makeOnboardingViewModelFactory(): ViewModelProvider.Factory {
         return OnboardingViewModel.provideFactory(
             application = context.applicationContext as android.app.Application
+        )
+    }
+
+    fun makeSeaRegionListViewModelFactory(seaAreaId: String): ViewModelProvider.Factory {
+        return SeaRegionListViewModel.provideFactory(
+            application = context.applicationContext as android.app.Application,
+            seaAreaId = seaAreaId
+        )
+    }
+
+    fun makeSeaAnalysisDetailViewModelFactory(region: Region): ViewModelProvider.Factory {
+        return SeaAnalysisDetailViewModel.provideFactory(
+            oceanUseCase = makeOceanUseCase(),
+            region = region
         )
     }
 

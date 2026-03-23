@@ -2,6 +2,8 @@ package com.onbada.seathermo.presentation.seaanalysis.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import com.onbada.seathermo.common.utils.AppPreferences
 import com.onbada.seathermo.common.utils.PreferenceConstants
 import com.onbada.seathermo.domain.entity.Region
@@ -55,11 +57,30 @@ class SeaRegionListViewModel(
             .filter { it.toSea().id == seaAreaId }
             .sortedBy { it.regionName }
 
-        _uiState.update { 
+        _uiState.update {
             it.copy(
                 isLoading = false,
                 observatories = filteredRegions
             )
+        }
+    }
+
+    companion object {
+        /**
+         * AndroidViewModel은 Application context가 필요하므로 커스텀 Factory를 제공합니다.
+         *
+         * [개념] ViewModelProvider.Factory는 ViewModel 생성자에 파라미터를 주입할 때 사용합니다.
+         *        기본 Factory는 파라미터 없는 생성자만 지원하므로, seaAreaId처럼 추가 파라미터가
+         *        필요할 때 이 패턴을 사용합니다. iOS의 StateObject(wrappedValue: ViewModel(sea:))와 동일한 의도입니다.
+         */
+        fun provideFactory(
+            application: Application,
+            seaAreaId: String
+        ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return SeaRegionListViewModel(application, seaAreaId) as T
+            }
         }
     }
 }

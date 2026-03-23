@@ -11,6 +11,7 @@ import com.onbada.seathermo.common.utils.AppPreferences
 import com.onbada.seathermo.common.utils.PreferenceConstants
 import com.onbada.seathermo.presentation.maintab.MainTabScreen
 import com.onbada.seathermo.presentation.onboarding.screen.OnboardingScreen
+import com.onbada.seathermo.presentation.seaanalysis.screen.SeaAnalysisDetailScreen
 import com.onbada.seathermo.presentation.onboarding.viewmodel.OnboardingViewModel
 import com.onbada.seathermo.presentation.splash.SplashScreen
 import com.onbada.seathermo.presentation.splash.viewmodel.SplashViewModel
@@ -91,7 +92,31 @@ fun AppNavigation(diContainer: ApplicationDIContainer) {
 
         // ── Main (BottomTab) ─────────────────────────────────────────────────
         composable("main") {
-            MainTabScreen(diContainer = diContainer)
+            MainTabScreen(
+                diContainer = diContainer,
+                onNavigateToSeaAnalysisDetail = { stationCode ->
+                    // [개념] 인코딩 없이 stationCode를 그대로 route에 삽입합니다.
+                    //        stationCode는 영문+숫자로 구성되어 별도 인코딩이 불필요합니다.
+                    navController.navigate("sea_analysis_detail/$stationCode")
+                }
+            )
+        }
+
+        // ── SeaAnalysisDetail ────────────────────────────────────────────────
+        // [개념] {stationCode}는 NavArgs 플레이스홀더입니다.
+        //        backStackEntry.arguments?.getString("stationCode")로 값을 꺼냅니다.
+        //        iOS의 NavigationLink(destination: SeaAnalysisDetailView(viewModel:))에 대응합니다.
+        composable("sea_analysis_detail/{stationCode}") { backStackEntry ->
+            val stationCode = backStackEntry.arguments?.getString("stationCode") ?: ""
+            SeaAnalysisDetailScreen(
+                stationCode = stationCode,
+                diContainer = diContainer,
+                onNavigateBack = {
+                    // [개념] popBackStack()은 백스택에서 현재 화면을 제거하고 이전 화면으로 돌아갑니다.
+                    //        iOS의 presentationMode.wrappedValue.dismiss()에 대응합니다.
+                    navController.popBackStack()
+                }
+            )
         }
     }
 }

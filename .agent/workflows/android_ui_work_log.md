@@ -11,7 +11,7 @@
 | iOS 소스 | `/Users/kimbyeongjoon/Documents/workspace_seathermo/SeaThermo_iOS/SeaThermo/Presentation/` | UI 구조, 로직 참고 |
 | Figma | MCP 연결 (현재 선택 노드 기준 조회) | 정확한 크기·색상·간격 |
 | Android ViewModel | `SeaThermo_AOS/app/src/main/.../presentation/` | 이미 완성된 비즈니스 로직 |
-| Android MainActivity | `SeaThermo_AOS/app/.../MainActivity.kt` | NavHost 진입점 |
+| Android AppNavigation | `SeaThermo_AOS/app/.../presentation/AppNavigation.kt` | NavHost 진입점 |
 
 ---
 
@@ -23,8 +23,6 @@
 |--------------|-------------|--------|
 | `CrawlingCurrentTemperatureScreen.kt` | `CurrentTemperatureScreen.kt` | 데이터 소스만 다름 |
 | `CrawlingOceanSelectScreen.kt` | `OceanSelectScreen.kt` | 데이터 소스만 다름 |
-| `CrawlingCurrentTemperatureViewModel` | `CurrentTemperatureViewModel` | 역할 동일, API 호출 방식 다름 |
-| `CrawlingOceanSelectViewModel` | `OceanSelectViewModel` | 역할 동일, API 호출 방식 다름 |
 
 **규칙:** UI 변경 사항은 반드시 **두 세트에 동일하게 적용**해야 합니다.
 현재는 **크롤링 버전 기준으로 구현** 중입니다.
@@ -37,13 +35,13 @@
 1단계 (Foundation)   → 테마 · 디자인 토큰
 2단계 (Entry Flow)   → Splash → Onboarding → MainTab 연결
 3단계 (Tab Screens)  → CurrentTemperature → SeaAnalysis → FishingRecord → History → Setting
-4단계 (Sub Screens)  → OceanSelect · SeaAnalysisDetail · HistoryDetail · HistoryImageViewer
+4단계 (Sub Screens)  → SeaRegionList · SeaAnalysisDetail · HistoryDetail · HistoryImageViewer
 5단계 (Polish)       → 공통 컴포넌트 정리 · 애니메이션 · QA
 ```
 
 ---
 
-## 📊 현재 구현 상태
+## 📊 현재 구현 상태 (2026-03-23 기준, 업데이트: SeaAnalysisDetailScreen 완성)
 
 ### ViewModel (비즈니스 로직) — 전체 완성 ✅
 | 파일 | 상태 |
@@ -53,6 +51,7 @@
 | `CurrentTemperatureViewModel.kt` | ✅ 완성 |
 | `CrawlingCurrentTemperatureViewModel.kt` | ✅ 완성 |
 | `OceanSelectViewModel.kt` | ✅ 완성 |
+| `CrawlingOceanSelectViewModel.kt` | ✅ 완성 |
 | `SeaAnalysisViewModel.kt` | ✅ 완성 |
 | `SeaAnalysisDetailViewModel.kt` | ✅ 완성 |
 | `SeaRegionListViewModel.kt` | ✅ 완성 |
@@ -67,14 +66,16 @@
 | `ui/theme/` (Color, Type, Shape) | 🟡 점진적 추가 중 | 화면 구현 시 필요한 것만 추가 |
 | `SplashScreen.kt` | ✅ 완성 | |
 | `OnboardingScreen.kt` | ✅ 완성 | |
-| `MainTabScreen.kt` | 🟡 골격만 (Placeholder) | **현재 작업** — 탭 아이콘 연결 필요 |
-| `CrawlingCurrentTemperatureScreen.kt` | 🟡 진행중 | 카드 섹션 구현 완료, OceanSelect Sheet 연결 완료 |
-| `CurrentTemperatureScreen.kt` | 🟡 진행중 | 카드 섹션 구현 완료, OceanSelect Sheet 연결 완료 |
-| `CrawlingOceanSelectScreen.kt` | 🔴 미구현 | |
-| `OceanSelectScreen.kt` | 🔴 미구현 | |
-| `SeaAnalysisScreen.kt` | 🔴 미구현 | |
-| `SeaAnalysisDetailScreen.kt` | 🔴 미구현 | |
-| `FishingRecordScreen.kt` | 🔴 미구현 | |
+| `MainTabScreen.kt` | 🟡 진행중 | CurrentTemperature·SeaAnalysis 연결됨, 나머지 3탭 Placeholder |
+| `AppNavigation.kt` | 🟡 진행중 | splash/onboarding/main 3개 route만 존재, 서브화면 route 추가 필요 |
+| `CrawlingCurrentTemperatureScreen.kt` | ✅ 완성 | OceanSelect Sheet 연결 완료 |
+| `CurrentTemperatureScreen.kt` | ✅ 완성 | OceanSelect Sheet 연결 완료 |
+| `CrawlingOceanSelectScreen.kt` | ✅ 완성 | |
+| `OceanSelectScreen.kt` | ✅ 완성 | |
+| `SeaAnalysisScreen.kt` | ✅ 완성 | MainTab 연결, onNavigateToDetail 콜백 연결 완료 |
+| `SeaRegionListScreen.kt` | ✅ 완성 | ModalBottomSheet + SeaRegionRowView 구현 완료 |
+| `SeaAnalysisDetailScreen.kt` | ✅ 완성 | Canvas 꺾은선 그래프 + 수온 카드 3열 + Footer 구현 완료 |
+| `FishingRecordScreen.kt` | 🔴 미구현 | KakaoMap/GoogleMap AndroidView 래핑 필요 |
 | `HistoryScreen.kt` | 🔴 미구현 | |
 | `HistoryDetailScreen.kt` | 🔴 미구현 | |
 | `HistoryImageViewer.kt` | 🔴 미구현 | |
@@ -82,91 +83,29 @@
 
 ---
 
-## 🔨 단계별 상세 작업 계획
+## 🔨 다음 작업: FishingRecordScreen ← **현재 작업**
 
-### 1단계: 테마 · 디자인 시스템 구축
+### 완료된 흐름
 
-**경로:** `app/src/main/java/com/onbada/seathermo/ui/theme/`
-**iOS 참고:** `SeaThermo_iOS/SeaThermo/Common/Extentions/Color.swift`
-
-- [ ] `Color.kt` — iOS Color.swift 기반 색상 이식 (Figma 변수 정의로 hex 추출)
-- [ ] `Type.kt` — 앱 전체 타이포그래피 (iOS 폰트 스타일 → Material3 매핑)
-- [ ] `Shape.kt` — 카드·버튼 모서리 반경
-- [ ] `SeaThermoTheme.kt` — MaterialTheme 래퍼
-
----
-
-### 2단계: 진입 플로우
-
-#### 2-2. OnboardingScreen
-**경로:** `presentation/onboarding/OnboardingScreen.kt`
-**iOS 참고:** `Presentation/Onboarding/OnboardingView.swift`
-
-- [ ] Figma Onboarding 프레임 노드 확인
-- [ ] `OnboardingScreen.kt` Composable 생성
-- [ ] `OnboardingViewModel` 연결
-- [ ] `MainActivity.kt` NavHost `"onboarding"` route 연결
-
-#### 2-3. MainTabScreen 완성 ← **현재 작업**
-**경로:** `presentation/maintab/MainTabScreen.kt`
-**iOS 참고:** `Presentation/MainTab/MainTabView.swift`
-
-**iOS 탭 아이콘 에셋 위치:**
-`SeaThermo_iOS/SeaThermo/Assets.xcassets/TabBar/tab_*.imageset/`
-→ @2x → `drawable-xhdpi/`, @3x → `drawable-xxhdpi/`
-
-**색상 (iOS 기준, 이미 하드코딩됨):**
-- 활성: `#2563EB`
-- 비활성: `#8E8E93`
-- 탭바 배경: `white` (alpha 0.8)
-- 탭 레이블 폰트: 10sp
-
-- [x] 골격 구조 완성
-- [ ] iOS 탭 아이콘 PNG → Android drawable 복사 (5개)
-- [ ] `TabItem`에 실제 아이콘 리소스 연결
-- [ ] NavigationBar 색상·폰트 스타일 적용
-- [ ] 각 탭 Content를 실제 Screen으로 교체 (각 Screen 구현 후 순차적으로)
+```
+SeaAnalysisScreen (해역 카드 탭)
+  → SeaRegionListScreen (ModalBottomSheet) ✅
+      → 관측소 행 탭
+          → SeaAnalysisDetailScreen (Navigation push) ✅
+```
 
 ---
 
-### 3단계: 탭 화면
+### 5-1. FishingRecordScreen (다음)
 
-#### 3-1. CurrentTemperatureScreen
-**경로:** `presentation/currenttemperature/screen/CurrentTemperatureScreen.kt`
-**iOS 참고:** `Presentation/CurrentTemperature/View/CurrentTemperatureView.swift`
-- [ ] Figma 노드 확인 → iOS 구조 분석 → Screen 구현 → ViewModel 연결 → MainTab 연결
-
-#### 3-2. SeaAnalysisScreen
-**경로:** `presentation/seaanalysis/SeaAnalysisScreen.kt`
-**iOS 참고:** `Presentation/SeaAnalysis/SeaAnalysisView.swift`
-- [ ] Figma 노드 확인 → Screen 구현 → ViewModel 연결 → MainTab 연결
-
-#### 3-3. FishingRecordScreen
 **경로:** `presentation/fishingrecord/screen/FishingRecordScreen.kt`
-**iOS 참고:** `Presentation/FishingRecord/View/FishingRecordView.swift`
-**특이사항:** KakaoMap/GoogleMap AndroidView 래핑 필요
-- [ ] `FishingRecordScreen.kt` + `KakaoMapView.kt` + `GoogleMapView.kt` 구현
+**iOS 참고:** `Presentation/FishingRecord/FishingRecordView.swift`
+**ViewModel:** `FishingRecordViewModel.kt`
 
-#### 3-4. HistoryScreen
-**경로:** `presentation/history/HistoryScreen.kt`
-**iOS 참고:** `Presentation/History/View/HistoryView.swift`
-- [ ] Figma 노드 확인 → Screen 구현 → ViewModel 연결 → MainTab 연결
-
-#### 3-5. SettingScreen
-**경로:** `presentation/setting/SettingScreen.kt`
-**iOS 참고:** `Presentation/Setting/SettingView.swift`
-- [ ] Figma 노드 확인 → Screen 구현 → ViewModel 연결 → MainTab 연결
-
----
-
-### 4단계: 서브 화면
-
-| 화면 | 경로 | iOS 참고 | 특이사항 |
-|------|------|---------|---------|
-| `OceanSelectScreen` | `presentation/currenttemperature/screen/` | `Presentation/CurrentTemperature/View/OceanSelectView.swift` | |
-| `SeaAnalysisDetailScreen` | `presentation/seaanalysis/` | `Presentation/SeaAnalysis/SeaAnalysisDetailView.swift` | 온도 꺾은선 그래프 Canvas |
-| `HistoryDetailScreen` | `presentation/history/` | `Presentation/History/View/HistoryDetailView.swift` | |
-| `HistoryImageViewer` | `presentation/history/` | `Presentation/History/View/HistoryImageViewer.swift` | |
+**주요 구현 포인트:**
+- KakaoMap/GoogleMap AndroidView 래핑 필요
+- GPS 위치 권한 처리
+- `AppNavigation.kt`에 FishingRecord 관련 route 추가 필요
 
 ---
 

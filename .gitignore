@@ -15,3 +15,13 @@
 local.properties
 .swagger-cache/
 .claude/settings.local.json
+
+# AI 도구 설정 (보안/개인 설정)
+.mcp.json
+.gemini/
+GEMINI.md
+
+# IDE 개인 설정
+.idea/deploymentTargetSelector.xml
+.idea/deviceManager.xml
+.idea/inspectionProfiles/

@@ -25,6 +25,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -87,10 +88,12 @@ fun SeaRegionListScreen(
 
     // [개념] ModalBottomSheet는 onDismissRequest로 외부 탭/스와이프 다운 시 닫힘을 처리합니다.
     //        dragHandle 파라미터로 기본 핸들을 교체하여 Figma 수치를 정확히 구현합니다.
+    // Material3 1.3.x 변경: fillMaxHeight를 ModalBottomSheet modifier에 적용하면 시트가 상단 기준으로 배치됨.
+    // 대신 내부 Column에 화면 높이의 90%를 직접 지정하여 시트가 하단에서 올라오도록 합니다.
+    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        modifier = Modifier.fillMaxHeight(0.9f),
         containerColor = SheetBackground,
         tonalElevation = 0.dp,
         dragHandle = {
@@ -111,7 +114,10 @@ fun SeaRegionListScreen(
             }
         }
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier
+            .fillMaxWidth()
+            .height(screenHeight * 0.9f)
+        ) {
 
             // ── 헤더 ──────────────────────────────────────────────────────────
             // iOS: VStack(spacing: 0) { headerSection.padding(.top, 30).padding(.horizontal, 16).padding(.bottom, 20) }
@@ -156,7 +162,8 @@ private fun RegionListHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 25.dp, start = 16.dp, end = 16.dp, bottom = 20.dp),
+            // dragHandle 컴포저블이 이미 8+5+12=25dp를 차지하므로 여기서는 top padding 불필요
+            .padding(top = 0.dp, start = 16.dp, end = 16.dp, bottom = 20.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Top
     ) {

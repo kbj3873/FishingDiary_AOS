@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,6 +26,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -87,14 +89,15 @@ fun CrawlingOceanSelectScreen(
         }
     }
 
-    // [개념] modifier = Modifier.fillMaxHeight(0.8f) 로 화면 높이의 80%만 차지합니다.
-    //        iOS의 .presentationDetents([.fraction(0.8)])에 대응합니다.
+    // [개념] iOS의 .presentationDetents([.fraction(0.8)])에 대응합니다.
     //        tonalElevation = 0.dp 로 Material3 색조 오버레이를 제거하여 containerColor를 정확히 표현합니다.
     //        dragHandle 파라미터로 기본 핸들을 교체하여 Figma 수치(바 위 8dp, 높이 5dp, 아래 12dp)를 정확히 구현합니다.
+    //        Material3 1.3.x 변경: fillMaxHeight를 ModalBottomSheet modifier에 적용하면 시트가 상단 기준으로 배치됨.
+    //        대신 내부 Column에 화면 높이의 80%를 직접 지정하여 시트가 하단에서 올라오도록 합니다.
+    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        modifier = Modifier.fillMaxHeight(0.8f),
         containerColor = SheetBackground,
         tonalElevation = 0.dp,
         dragHandle = {
@@ -115,7 +118,10 @@ fun CrawlingOceanSelectScreen(
             }
         }
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier
+            .fillMaxWidth()
+            .height(screenHeight * 0.8f)
+        ) {
 
             // ── 헤더 ──────────────────────────────────────────────────────
             CrawlingOceanSelectHeader(onDismiss = onDismiss)
@@ -263,6 +269,7 @@ private fun CrawlingStationItem(
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
+                    .offset(y = 1.dp)
                     .height(20.dp)
                     .clip(RoundedCornerShape(6.dp))
                     .background(BadgeBackground)

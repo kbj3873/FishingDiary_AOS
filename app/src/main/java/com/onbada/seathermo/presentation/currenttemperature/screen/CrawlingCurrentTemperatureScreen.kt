@@ -16,9 +16,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -69,6 +71,7 @@ private val CrawlingCardGradient = Brush.verticalGradient(
  * @param viewModel 크롤링 기반 현재 수온 ViewModel
  * @param diContainer CrawlingOceanSelectViewModel 생성에 필요한 DI 컨테이너
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CrawlingCurrentTemperatureScreen(
     viewModel: CrawlingCurrentTemperatureViewModel,
@@ -89,28 +92,37 @@ fun CrawlingCurrentTemperatureScreen(
             CrawlingHeaderSection()
 
             // ── 콘텐츠 ──────────────────────────────────────────────────────
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 16.dp, bottom = 16.dp)
+            // [개념] PullToRefreshBox는 iOS의 .refreshable { } 모디파이어에 대응합니다.
+            //        isRefreshing 으로 로딩 인디케이터 표시 여부를, onRefresh 로 갱신 동작을 지정합니다.
+            //        내부 콘텐츠가 verticalScroll 또는 LazyColumn 이어야 당기기 제스처가 동작합니다.
+            PullToRefreshBox(
+                isRefreshing = uiState.isLoading,
+                onRefresh = { viewModel.fetchStationList() },
+                modifier = Modifier.fillMaxSize()
             ) {
-                // 지역 추가/관리 버튼
-                CrawlingAddRegionButton(
-                    onClick = { viewModel.setOceanSelectPresented(true) }
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp)
+                        .padding(top = 16.dp, bottom = 16.dp)
+                ) {
+                    // 지역 추가/관리 버튼
+                    CrawlingAddRegionButton(
+                        onClick = { viewModel.setOceanSelectPresented(true) }
+                    )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                // [개념] when 조건 분기: 즐겨찾기 없으면 EmptyState, 있으면 카드 목록 표시
-                if (uiState.oceanStations.isEmpty() && !uiState.isLoading) {
-                    CrawlingEmptyState()
-                } else {
-                    // 즐겨찾기 지역 카드 목록
-                    uiState.oceanStations.forEach { station ->
-                        CrawlingOceanRegionCardView(station = station)
-                        Spacer(modifier = Modifier.height(12.dp))
+                    // [개념] when 조건 분기: 즐겨찾기 없으면 EmptyState, 있으면 카드 목록 표시
+                    if (uiState.oceanStations.isEmpty() && !uiState.isLoading) {
+                        CrawlingEmptyState()
+                    } else {
+                        // 즐겨찾기 지역 카드 목록
+                        uiState.oceanStations.forEach { station ->
+                            CrawlingOceanRegionCardView(station = station)
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
                     }
                 }
             }

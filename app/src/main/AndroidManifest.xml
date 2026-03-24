@@ -13,6 +13,9 @@
     <!-- Background location (Android 10+) -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
+    <!-- Camera permission (낚시 기록 사진 촬영) -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
     <!-- Foreground Service permissions -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />

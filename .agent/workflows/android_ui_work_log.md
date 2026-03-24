@@ -41,7 +41,7 @@
 
 ---
 
-## 📊 현재 구현 상태 (2026-03-23 기준, 업데이트: SeaAnalysisDetailScreen 완성)
+## 📊 현재 구현 상태 (2026-03-24 기준, 업데이트: FishingRecordScreen 구현 시작)
 
 ### ViewModel (비즈니스 로직) — 전체 완성 ✅
 | 파일 | 상태 |
@@ -66,8 +66,8 @@
 | `ui/theme/` (Color, Type, Shape) | 🟡 점진적 추가 중 | 화면 구현 시 필요한 것만 추가 |
 | `SplashScreen.kt` | ✅ 완성 | |
 | `OnboardingScreen.kt` | ✅ 완성 | |
-| `MainTabScreen.kt` | 🟡 진행중 | CurrentTemperature·SeaAnalysis 연결됨, 나머지 3탭 Placeholder |
-| `AppNavigation.kt` | 🟡 진행중 | splash/onboarding/main 3개 route만 존재, 서브화면 route 추가 필요 |
+| `MainTabScreen.kt` | 🟡 진행중 | CurrentTemperature·SeaAnalysis·Setting 연결됨, FishingRecord·History Placeholder |
+| `AppNavigation.kt` | 🟡 진행중 | splash/onboarding/main/webview/sea_analysis_detail 5개 route 존재 |
 | `CrawlingCurrentTemperatureScreen.kt` | ✅ 완성 | OceanSelect Sheet 연결 완료 |
 | `CurrentTemperatureScreen.kt` | ✅ 완성 | OceanSelect Sheet 연결 완료 |
 | `CrawlingOceanSelectScreen.kt` | ✅ 완성 | |
@@ -75,37 +75,57 @@
 | `SeaAnalysisScreen.kt` | ✅ 완성 | MainTab 연결, onNavigateToDetail 콜백 연결 완료 |
 | `SeaRegionListScreen.kt` | ✅ 완성 | ModalBottomSheet + SeaRegionRowView 구현 완료 |
 | `SeaAnalysisDetailScreen.kt` | ✅ 완성 | Canvas 꺾은선 그래프 + 수온 카드 3열 + Footer 구현 완료 |
-| `FishingRecordScreen.kt` | 🔴 미구현 | KakaoMap/GoogleMap AndroidView 래핑 필요 |
+| `FishingRecordScreen.kt` | 🔴 미구현 | ← **현재 작업** |
 | `HistoryScreen.kt` | 🔴 미구현 | |
 | `HistoryDetailScreen.kt` | 🔴 미구현 | |
 | `HistoryImageViewer.kt` | 🔴 미구현 | |
-| `SettingScreen.kt` | 🔴 미구현 | |
 
 ---
 
-## 🔨 다음 작업: FishingRecordScreen ← **현재 작업**
+## 🔨 현재 작업: FishingRecordScreen
 
-### 완료된 흐름
+### iOS 참고 파일
+- `Presentation/FishingRecord/View/FishingRecordView.swift` — 메인 화면
+- `Presentation/FishingRecord/View/Components/RecordMapView.swift` — Apple Map (MKMapView) 래핑
+- `Presentation/FishingRecord/View/Components/RecordKakaoMapView.swift` — Kakao Map 래핑
 
+### 화면 구조 (iOS 기준)
 ```
-SeaAnalysisScreen (해역 카드 탭)
-  → SeaRegionListScreen (ModalBottomSheet) ✅
-      → 관측소 행 탭
-          → SeaAnalysisDetailScreen (Navigation push) ✅
+Box (ZStack)
+  ├── 지도 레이어 (mapType에 따라 KakaoMap 또는 GoogleMap)
+  └── 오버레이 레이어 (Box)
+        ├── TopInfoBar (상단 좌측)
+        │     상태Dot + 상태텍스트 + [속도 + 단위토글(knots/km/h)] + 저장지점수
+        ├── MapControlButtons (우측 중단)
+        │     줌인 / 줌아웃 / 내위치
+        └── BottomControlBar (하단 중앙)
+              [안내텍스트 - 녹화 전만] + 녹화버튼(중앙) + 카메라버튼(우측)
+팝업 (Overlay)
+  ├── 기록 중단 확인 팝업
+  ├── 위치 권한 요청 팝업
+  └── 카메라 권한 요청 팝업
 ```
 
----
+### 필요한 이미지 에셋
+iOS 에셋(`SeaThermo_iOS/.../FishingRecord/`) → Android 밀도별 변환 필요:
+- `btn_zoom_in` / `btn_zoom_out` / `btn_my_location` — 지도 컨트롤
+- `btn_record_play` / `btn_record_stop` — 녹화 버튼
+- `btn_camera` — 카메라 버튼
+- `ic_map_marker_blue` / `ic_map_marker_orange` / `ic_map_marker_red` — 지도 상태 마커
 
-### 5-1. FishingRecordScreen (다음)
-
-**경로:** `presentation/fishingrecord/screen/FishingRecordScreen.kt`
-**iOS 참고:** `Presentation/FishingRecord/FishingRecordView.swift`
-**ViewModel:** `FishingRecordViewModel.kt`
-
-**주요 구현 포인트:**
-- KakaoMap/GoogleMap AndroidView 래핑 필요
-- GPS 위치 권한 처리
-- `AppNavigation.kt`에 FishingRecord 관련 route 추가 필요
+### 구현 세부 단계 (순서대로 진행)
+```
+Step 1: 이미지 에셋 변환 (iOS @2x/@3x → Android 밀도별 폴더)
+Step 2: FishingRecordScreen 기본 레이아웃 (지도 placeholder + 오버레이 UI)
+Step 3: TopInfoBar 구현 (상태 표시, 속도, 단위 토글)
+Step 4: MapControlButtons + BottomControlBar 구현
+Step 5: 권한 처리 (위치 권한 런타임 요청)
+Step 6: 카메라 연동 (사진 촬영 / ActivityResultLauncher)
+Step 7: 지도 AndroidView 래핑 (GoogleMapView 또는 KakaoMapView)
+Step 8: 지도에 경로선/마커 그리기 (polyline + annotation)
+Step 9: 팝업 구현 (기록 중단, 권한 안내)
+Step 10: MainTabScreen 연결 + 빌드 확인
+```
 
 ---
 

@@ -13,11 +13,14 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,6 +33,8 @@ import com.onbada.seathermo.R
 import com.onbada.seathermo.application.di.ApplicationDIContainer
 import com.onbada.seathermo.presentation.currenttemperature.screen.CrawlingCurrentTemperatureScreen
 import com.onbada.seathermo.presentation.currenttemperature.viewmodel.CrawlingCurrentTemperatureViewModel
+import com.onbada.seathermo.presentation.fishingrecord.screen.FishingRecordScreen
+import com.onbada.seathermo.presentation.fishingrecord.viewmodel.FishingRecordViewModel
 import com.onbada.seathermo.presentation.seaanalysis.screen.SeaAnalysisScreen
 import com.onbada.seathermo.infrastructure.webview.WebPage
 import com.onbada.seathermo.presentation.setting.screen.SettingScreen
@@ -161,7 +166,14 @@ fun MainTabScreen(
                         onNavigateToSeaAnalysisDetail(stationCode)
                     }
                 )
-                TabItem.FishingRecord -> PlaceholderScreen("낚시기록")        // TODO: FishingRecordScreen
+                TabItem.FishingRecord -> {
+                    // [개념] FishingRecordViewModel은 AndroidViewModel이므로 Application Context가 필요합니다.
+                    //        provideFactory()로 Application과 UseCase를 주입합니다.
+                    val fishingRecordViewModel: FishingRecordViewModel = viewModel(
+                        factory = diContainer.makeFishingRecordViewModelFactory()
+                    )
+                    FishingRecordScreen(viewModel = fishingRecordViewModel)
+                }
                 TabItem.History -> PlaceholderScreen("히스토리")              // TODO: HistoryScreen
                 TabItem.Settings -> {
                     // [개념] viewModel(factory = ...)은 DI 컨테이너의 팩토리로 ViewModel을 생성합니다.

@@ -3,6 +3,8 @@ package com.onbada.seathermo.presentation.fishingrecord.viewmodel
 import android.app.Application
 import android.location.Location
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.onbada.seathermo.domain.entity.GeoPoint
 import com.onbada.seathermo.domain.entity.MapLineInfo
@@ -239,13 +241,54 @@ class FishingRecordViewModel(
     fun dismissPopups() {
         _uiState.update { it.copy(
             isStopPopupPresented = false,
+            isLocationRationalePopupPresented = false,
             isLocationPermissionPopupPresented = false,
+            isCameraRationalePopupPresented = false,
             isCameraPermissionPopupPresented = false
         )}
     }
 
     fun showStopPopup() {
         _uiState.update { it.copy(isStopPopupPresented = true) }
+    }
+
+    // [개념] 1차 거부 시 표시하는 Rationale 팝업 — 권한이 왜 필요한지 설명 후 재요청합니다.
+    fun showLocationRationalePopup() {
+        _uiState.update { it.copy(isLocationRationalePopupPresented = true) }
+    }
+
+    // [개념] 영구 거부 시 표시하는 팝업 — 시스템 설정으로 안내합니다.
+    fun showLocationPermissionPopup() {
+        _uiState.update { it.copy(isLocationPermissionPopupPresented = true) }
+    }
+
+    fun showCameraRationalePopup() {
+        _uiState.update { it.copy(isCameraRationalePopupPresented = true) }
+    }
+
+    fun showCameraPermissionPopup() {
+        _uiState.update { it.copy(isCameraPermissionPopupPresented = true) }
+    }
+
+    companion object {
+        /**
+         * ViewModel 생성 팩토리.
+         *
+         * [개념] AndroidViewModel은 Application 참조가 필요하므로
+         *        기본 ViewModelProvider.Factory 대신 AndroidViewModelFactory를 상속합니다.
+         *        iOS의 static func make() -> FishingRecordViewModel 패턴에 대응합니다.
+         */
+        fun provideFactory(
+            application: Application,
+            useCase: FishingRecordUseCase
+        ): ViewModelProvider.Factory {
+            return object : ViewModelProvider.AndroidViewModelFactory(application) {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    return FishingRecordViewModel(application, useCase) as T
+                }
+            }
+        }
     }
 }
 
@@ -266,7 +309,13 @@ data class FishingRecordUiState(
     val savedImagePaths: List<String> = emptyList(),
     val savedPointCount: Int = 0,
     val isStopPopupPresented: Boolean = false,
+    // 위치 권한 1차 거부 시 — 재요청 안내 팝업
+    val isLocationRationalePopupPresented: Boolean = false,
+    // 위치 권한 영구 거부 시 — 시스템 설정 안내 팝업
     val isLocationPermissionPopupPresented: Boolean = false,
+    // 카메라 권한 1차 거부 시 — 재요청 안내 팝업
+    val isCameraRationalePopupPresented: Boolean = false,
+    // 카메라 권한 영구 거부 시 — 시스템 설정 안내 팝업
     val isCameraPermissionPopupPresented: Boolean = false
 ) {
     val convertedSpeed: Double

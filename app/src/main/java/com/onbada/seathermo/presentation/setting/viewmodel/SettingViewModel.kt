@@ -1,6 +1,7 @@
 package com.onbada.seathermo.presentation.setting.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import com.onbada.seathermo.domain.entity.MapType
 import com.onbada.seathermo.managers.FDAppManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,6 +59,22 @@ class SettingViewModel(
      */
     fun clearCache() {
         // TODO: 캐시 삭제 로직 구현
+    }
+
+    companion object {
+        /**
+         * FDAppManager 싱글턴을 주입받는 커스텀 Factory.
+         *
+         * [개념] ViewModel 생성자에 파라미터를 전달할 때 ViewModelProvider.Factory가 필요합니다.
+         *        DI 컨테이너(ApplicationDIContainer)를 통해 일관되게 생성합니다.
+         *        iOS의 StateObject(wrappedValue: SettingViewModel(appManager:))에 대응합니다.
+         */
+        fun provideFactory(): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return SettingViewModel() as T
+            }
+        }
     }
 }
 

@@ -9,6 +9,8 @@ import androidx.navigation.compose.rememberNavController
 import com.onbada.seathermo.application.di.ApplicationDIContainer
 import com.onbada.seathermo.common.utils.AppPreferences
 import com.onbada.seathermo.common.utils.PreferenceConstants
+import com.onbada.seathermo.infrastructure.webview.WebPage
+import com.onbada.seathermo.presentation.common.webview.SeaThermoWebView
 import com.onbada.seathermo.presentation.maintab.MainTabScreen
 import com.onbada.seathermo.presentation.onboarding.screen.OnboardingScreen
 import com.onbada.seathermo.presentation.seaanalysis.screen.SeaAnalysisDetailScreen
@@ -98,8 +100,31 @@ fun AppNavigation(diContainer: ApplicationDIContainer) {
                     // [개념] 인코딩 없이 stationCode를 그대로 route에 삽입합니다.
                     //        stationCode는 영문+숫자로 구성되어 별도 인코딩이 불필요합니다.
                     navController.navigate("sea_analysis_detail/$stationCode")
+                },
+                onNavigateToWebPage = { webPage ->
+                    // WebPage의 key를 route에 삽입합니다. (예: "webview/notices")
+                    // iOS의 path.append(WebPage.notices)에 대응합니다.
+                    navController.navigate("webview/${webPage.key}")
                 }
             )
+        }
+
+        // ── WebView ──────────────────────────────────────────────────────────
+        // pageKey: "notices" 또는 "licenses"
+        // iOS의 navigationDestination(for: WebPage.self) { page in SeaThermoWebView(url:) }에 대응합니다.
+        composable("webview/{pageKey}") { backStackEntry ->
+            val pageKey = backStackEntry.arguments?.getString("pageKey") ?: ""
+            val webPage = WebPage.fromKey(pageKey)
+
+            if (webPage != null) {
+                // URL = 온바다 서버 Base URL + WebPage 경로
+                // iOS: applicationDIContainer.appConfiguration.apiOnbadaURL + page.path
+                val url = diContainer.appConfiguration.apiOnbadaURL + webPage.path
+                SeaThermoWebView(
+                    url = url,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
         }
 
         // ── SeaAnalysisDetail ────────────────────────────────────────────────

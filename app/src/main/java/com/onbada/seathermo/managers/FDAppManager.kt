@@ -1,6 +1,7 @@
 package com.onbada.seathermo.managers
 
 import android.content.Context
+import android.content.SharedPreferences
 import com.onbada.seathermo.domain.entity.MapType
 
 /**
@@ -25,6 +26,12 @@ class FDAppManager private constructor() {
                 instance ?: FDAppManager().also { instance = it }
             }
         }
+
+        // SharedPreferences 파일명 및 키
+        // [개념] Android의 SharedPreferences는 iOS의 UserDefaults에 대응합니다.
+        //        키-값 쌍으로 앱 설정을 영구 저장하며, 앱 재시작 후에도 유지됩니다.
+        private const val PREFS_NAME = "seathermo_prefs"
+        private const val KEY_MAP_TYPE = "map_type"
 
         // ==================== 상수 정의 ====================
 
@@ -72,32 +79,48 @@ class FDAppManager private constructor() {
     // ==================== 속성 ====================
 
     /**
-     * 현재 지도 타입
-     * Current map type
+     * 현재 지도 타입.
      *
-     * 기본값: APPLE_MAP (Android에서는 Google Maps)
+     * 기본값: GOOGLE_MAP
+     * iOS의 var mapTp: MapType = .AppleMap에 대응합니다.
      */
     var mapType: MapType = MapType.GOOGLE_MAP
         private set
 
+    /**
+     * SharedPreferences 인스턴스 (appInitialize 호출 후 사용 가능).
+     *
+     * [개념] applicationContext를 저장해 두면 Activity/Fragment 생명주기와 무관하게
+     *        앱이 살아있는 동안 SharedPreferences에 접근할 수 있습니다.
+     *        iOS의 UserDefaults.standard에 대응합니다.
+     */
+    private var prefs: SharedPreferences? = null
+
     // ==================== 초기화 ====================
 
     /**
-     * 앱 초기화.
+     * 앱 초기화 — Application.onCreate()에서 반드시 호출합니다.
      *
-     * iOS의 appInitialize()에 대응합니다.
+     * iOS의 FDAppManager.init()에서 UserDefaults로 저장값을 로드하는 로직에 대응합니다.
+     * SharedPreferences에서 저장된 지도 타입을 읽어 mapType을 복원합니다.
      *
-     * @param context Application Context.
-     *                [개념] Android의 Context는 앱 환경 정보(파일 경로, 리소스 등)에 접근하는 핵심 객체입니다.
-     *                Swift에는 대응 개념이 없으며, iOS에서는 번들/파일 시스템에 직접 접근합니다.
+     * @param context Application Context
      */
     fun appInitialize(context: Context) {
-        // TODO: 초기화 로직 추가 예정
+        // [개념] applicationContext는 앱 전체 생명주기를 가진 Context입니다.
+        //        Activity Context를 저장하면 메모리 누수가 발생할 수 있으므로 반드시 applicationContext를 사용합니다.
+        prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+        // SharedPreferences에서 저장된 지도 타입 로드
+        // iOS: let savedMapType = FDUserDefaults.integer(forKey: UserDefaultKey.mapType)
+        val savedRawValue = prefs?.getInt(KEY_MAP_TYPE, 0) ?: 0
+        setMapType(savedRawValue)
     }
 
     /**
-     * 지도 타입 설정
-     * Set Map Type
+     * 지도 타입을 변경하고 SharedPreferences에 저장합니다.
+     *
+     * iOS의 mapTp didSet { FDUserDefaults.set(mapTp.rawValue, forKey: ...) }에 대응합니다.
      *
      * @param rawValue 지도 타입 정수값 (0: Google Map, 1: Kakao Map)
      */
@@ -107,5 +130,10 @@ class FDAppManager private constructor() {
             1 -> MapType.KAKAO_MAP
             else -> MapType.GOOGLE_MAP
         }
+
+        // [개념] SharedPreferences.edit().putInt().apply()는 비동기로 디스크에 저장합니다.
+        //        apply()는 commit()과 달리 메인 스레드를 블로킹하지 않습니다.
+        //        iOS의 UserDefaults.standard.set(_:forKey:)에 대응합니다.
+        prefs?.edit()?.putInt(KEY_MAP_TYPE, rawValue)?.apply()
     }
 }

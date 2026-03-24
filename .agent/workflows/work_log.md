@@ -53,31 +53,75 @@ Notion 페이지 생성(`create_page`) 시 `properties` 인자에 아래 규칙�
 ---
 
 ## 3. 본문(Body) 기록 양식
-페이지의 본문(`children`)은 아래 마크다운 구조를 따르며, Notion Block(Heading 2, Heading 3, Bullet list 등)으로 변환하여 작성합니다.
 
-### 🚀 오늘 진행한 주요 작업 (Heading 2)
-- **(작업 내용 요약)**: 오늘 수행한 핵심적인 개발 사항을 3~5줄 내외로 요약합니다. (Bullet list)
-- **구체성**: 단순히 "수정함"보다는 "Compose LazyColumn으로 RecyclerView 대체 및 레거시 Adapter 삭제"와 같이 구체적으로 기술합니다.
+### ⚠️ MCP 툴 제약사항 (반드시 숙지)
+`API-patch-block-children` 툴은 아래 두 가지 블록 타입만 지원합니다.
+- `paragraph` — 일반 텍스트 (섹션 제목에 사용)
+- `bulleted_list_item` — 불릿 리스트
 
-### 🛠 상세 구현 내용 (Heading 2)
-- **수정 파일 (Heading 3)**
-  - `(수정된_주요_파일_경로.kt)` (Bullet list)
-- **주요 로직 (Heading 3)**
-  - **(함수/클래스명)**: 변경된 핵심 로직과 그 이유를 설명합니다. (Bullet list)
+`heading_2`, `heading_3` 블록은 **지원하지 않습니다.**
+섹션 제목은 이모지 + 텍스트 조합의 `paragraph` 블록으로 대체합니다.
 
-### 📝 비고 및 특이사항 (Heading 2)
-- **이슈 (Heading 3)**
-  - 해결하지 못한 버그나, 추가로 발견된 문제점을 기록합니다.
-- **내일 할 일 (Heading 3)**
-  - 내일 이어서 진행할 작업이나 확인해야 할 사항을 메모합니다.
+### 본문 블록 구성 규칙
+
+| 역할 | 블록 타입 | 예시 텍스트 |
+|------|----------|------------|
+| 대섹션 제목 | `paragraph` | `🚀 오늘 진행한 주요 작업` |
+| 소섹션 제목 | `paragraph` | `▶ 신규 파일` |
+| 항목 내용 | `bulleted_list_item` | `SettingScreen.kt — 설정 화면 구현` |
+
+### 본문 섹션 구성
+```
+paragraph      → 🚀 오늘 진행한 주요 작업
+bulleted_list  → 작업 내용 3~5줄 (구체적으로)
+
+paragraph      → 🛠 상세 구현 내용
+paragraph      → ▶ 신규 파일
+bulleted_list  → 파일 경로
+paragraph      → ▶ 수정 파일
+bulleted_list  → 파일 경로 + 변경 내용
+paragraph      → ▶ 주요 로직
+bulleted_list  → 함수/클래스명: 핵심 로직 설명
+
+paragraph      → 📝 비고 및 특이사항
+paragraph      → ▶ 이슈
+bulleted_list  → 해결하지 못한 버그, 발견된 문제점
+paragraph      → ▶ 내일 할 일
+bulleted_list  → 내일 이어서 진행할 작업
+```
 
 ---
 
 ## 4. 실행 절차
-1. **작업 종료 시**: 사용자가 "오늘 작업 저장해줘" 또는 "로그 남겨줘"라고 요청하면 이 가이드를 로드합니다.
-2. **Context 분석**: 최근 대화 내용과 수정된 파일 목록(`git status` 등 활용 가능)을 분석하여 오늘 날짜의 작업 내용을 정리합니다.
-3. **Notion API 호출**:
-   - `mcp_notion-mcp-server_API-post-page` 도구를 사용합니다.
-   - 위 `2. 속성 매칭 규칙`에 맞춰 `properties` JSON을 구성합니다.
-   - 위 `3. 본문 기록 양식`에 맞춰 `children` JSON을 구성합니다.
-4. **결과 보고**: 생성된 Notion 페이지의 URL을 사용자에게 알려줍니다.
+
+> **핵심 원칙**: `API-post-page`의 `children` 파라미터는 동작하지 않습니다.
+> 반드시 **2단계**로 분리하여 실행합니다.
+
+### Step 1 — 페이지 생성 (`API-post-page`)
+`properties`만 포함하여 페이지를 생성합니다. `children`은 절대 포함하지 않습니다.
+
+```json
+{
+  "parent": { "type": "database_id", "database_id": "30412626-a195-80ad-8ea0-d28a0b7eb335" },
+  "properties": { /* 2. 속성 매칭 규칙 참고 */ }
+}
+```
+
+응답에서 생성된 페이지 `id`를 저장합니다.
+
+### Step 2 — 본문 추가 (`API-patch-block-children`)
+Step 1에서 받은 페이지 `id`를 `block_id`로 사용하여 본문 블록을 추가합니다.
+블록 수가 많을 경우 섹션 단위로 나눠 여러 번 호출합니다.
+
+```json
+{
+  "block_id": "<Step 1에서 받은 page id>",
+  "children": [
+    { "type": "paragraph", "paragraph": { "rich_text": [{ "type": "text", "text": { "content": "🚀 오늘 진행한 주요 작업" } }] } },
+    { "type": "bulleted_list_item", "bulleted_list_item": { "rich_text": [{ "type": "text", "text": { "content": "작업 내용" } }] } }
+  ]
+}
+```
+
+### Step 3 — 결과 보고
+생성된 Notion 페이지의 URL을 사용자에게 알려줍니다.

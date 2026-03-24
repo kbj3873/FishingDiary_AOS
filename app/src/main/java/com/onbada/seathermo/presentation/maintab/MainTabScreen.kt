@@ -31,6 +31,9 @@ import com.onbada.seathermo.application.di.ApplicationDIContainer
 import com.onbada.seathermo.presentation.currenttemperature.screen.CrawlingCurrentTemperatureScreen
 import com.onbada.seathermo.presentation.currenttemperature.viewmodel.CrawlingCurrentTemperatureViewModel
 import com.onbada.seathermo.presentation.seaanalysis.screen.SeaAnalysisScreen
+import com.onbada.seathermo.infrastructure.webview.WebPage
+import com.onbada.seathermo.presentation.setting.screen.SettingScreen
+import com.onbada.seathermo.presentation.setting.viewmodel.SettingViewModel
 
 // 탭 활성/비활성 색상 — iOS MainTabView.swift의 accentColor(#2563EB), 비활성(#8E8E93)과 동일
 private val TabActiveColor = Color(0xFF2563EB)
@@ -56,7 +59,8 @@ fun MainTabScreen(
     // [개념] 콜백 파라미터로 Navigation 의존성을 AppNavigation에 위임합니다.
     //        MainTabScreen은 navController를 직접 보유하지 않아 결합도를 낮춥니다.
     //        iOS의 @EnvironmentObject로 전달하는 패턴과 동일한 의도입니다.
-    onNavigateToSeaAnalysisDetail: (stationCode: String) -> Unit = {}
+    onNavigateToSeaAnalysisDetail: (stationCode: String) -> Unit = {},
+    onNavigateToWebPage: (WebPage) -> Unit = {}
 ) {
     // 현재 선택된 탭 인덱스 상태 관리.
     // [개념] remember { mutableIntStateOf(0) } 는 화면이 다시 그려져도(Recomposition)
@@ -159,7 +163,17 @@ fun MainTabScreen(
                 )
                 TabItem.FishingRecord -> PlaceholderScreen("낚시기록")        // TODO: FishingRecordScreen
                 TabItem.History -> PlaceholderScreen("히스토리")              // TODO: HistoryScreen
-                TabItem.Settings -> PlaceholderScreen("설정")                 // TODO: SettingScreen
+                TabItem.Settings -> {
+                    // [개념] viewModel(factory = ...)은 DI 컨테이너의 팩토리로 ViewModel을 생성합니다.
+                    //        FDAppManager 싱글턴을 통해 앱 전역 지도 타입 설정을 관리합니다.
+                    val settingViewModel: SettingViewModel = viewModel(
+                        factory = diContainer.makeSettingViewModelFactory()
+                    )
+                    SettingScreen(
+                        viewModel = settingViewModel,
+                        onNavigateToWebPage = onNavigateToWebPage
+                    )
+                }
             }
         }
     }

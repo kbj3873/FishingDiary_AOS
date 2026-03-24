@@ -11,6 +11,7 @@ import com.onbada.seathermo.presentation.onboarding.viewmodel.OnboardingViewMode
 import com.onbada.seathermo.domain.entity.Region
 import com.onbada.seathermo.presentation.seaanalysis.viewmodel.SeaAnalysisDetailViewModel
 import com.onbada.seathermo.presentation.seaanalysis.viewmodel.SeaRegionListViewModel
+import com.onbada.seathermo.presentation.setting.viewmodel.SettingViewModel
 import com.onbada.seathermo.presentation.splash.viewmodel.SplashViewModel
 import com.onbada.seathermo.data.repository.DefaultFishingRecordRepository
 import com.onbada.seathermo.data.repository.DefaultOceanRepository
@@ -133,6 +134,10 @@ class ApplicationDIContainer(private val context: Context) {
             application = context.applicationContext as android.app.Application,
             seaAreaId = seaAreaId
         )
+    }
+
+    fun makeSettingViewModelFactory(): ViewModelProvider.Factory {
+        return SettingViewModel.provideFactory()
     }
 
     fun makeSeaAnalysisDetailViewModelFactory(region: Region): ViewModelProvider.Factory {

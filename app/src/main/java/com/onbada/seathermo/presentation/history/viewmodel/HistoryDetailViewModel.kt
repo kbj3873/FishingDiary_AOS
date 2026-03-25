@@ -179,6 +179,18 @@ class HistoryDetailViewModel(
         useCase.deleteSession(sessionId)
         _uiState.update { it.copy(shouldDismiss = true) }
     }
+
+    companion object {
+        fun provideFactory(
+            sessionId: String,
+            useCase: FishingRecordUseCase
+        ): androidx.lifecycle.ViewModelProvider.Factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                return HistoryDetailViewModel(sessionId, useCase) as T
+            }
+        }
+    }
 }
 
 /**

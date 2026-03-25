@@ -165,6 +165,16 @@ class ApplicationDIContainer(private val context: Context) {
         return HistoryViewModel.provideFactory(useCase = makeFishingRecordUseCase())
     }
 
+    /**
+     * HistoryDetailViewModel 생성 팩토리.
+     */
+    fun makeHistoryDetailViewModelFactory(sessionId: String): ViewModelProvider.Factory {
+        return com.onbada.seathermo.presentation.history.viewmodel.HistoryDetailViewModel.provideFactory(
+            sessionId = sessionId,
+            useCase = makeFishingRecordUseCase()
+        )
+    }
+
     // ==================== Make UseCase ====================
 
     /**

@@ -1,6 +1,7 @@
 package com.onbada.seathermo.presentation.history.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.onbada.seathermo.domain.entity.FishingRecord
 import com.onbada.seathermo.domain.usecase.FishingRecordUseCase
@@ -106,6 +107,27 @@ class HistoryViewModel(
 
         // 최신순 정렬
         return items.sortedByDescending { it.date }
+    }
+
+    companion object {
+        /**
+         * HistoryViewModel 생성을 위한 ViewModelProvider.Factory.
+         *
+         * [개념] companion object는 클래스에 종속된 정적 메서드/프로퍼티를 정의합니다.
+         *        Swift의 static func와 동일합니다.
+         *        ViewModelProvider.Factory는 UseCase처럼 기본 생성자 외 의존성이 필요한
+         *        ViewModel을 생성할 때 반드시 필요합니다.
+         */
+        fun provideFactory(useCase: FishingRecordUseCase): ViewModelProvider.Factory {
+            // [개념] object : 인터페이스 { } 는 익명 클래스(Anonymous Class)를 생성합니다.
+            //        Swift에는 없는 개념으로, 인터페이스를 일회성으로 구현할 때 사용합니다.
+            return object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    return HistoryViewModel(useCase) as T
+                }
+            }
+        }
     }
 }
 

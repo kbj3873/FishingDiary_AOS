@@ -41,7 +41,7 @@
 
 ---
 
-## 📊 현재 구현 상태 (2026-03-24 기준, 업데이트: FishingRecordScreen 구현 시작)
+## 📊 현재 구현 상태 (2026-03-25 기준)
 
 ### ViewModel (비즈니스 로직) — 전체 완성 ✅
 | 파일 | 상태 |
@@ -66,7 +66,7 @@
 | `ui/theme/` (Color, Type, Shape) | 🟡 점진적 추가 중 | 화면 구현 시 필요한 것만 추가 |
 | `SplashScreen.kt` | ✅ 완성 | |
 | `OnboardingScreen.kt` | ✅ 완성 | |
-| `MainTabScreen.kt` | 🟡 진행중 | CurrentTemperature·SeaAnalysis·Setting 연결됨, FishingRecord·History Placeholder |
+| `MainTabScreen.kt` | 🟡 진행중 | 전체 탭 연결 완료. Lazy+Persistent 렌더링 적용. History만 Placeholder |
 | `AppNavigation.kt` | 🟡 진행중 | splash/onboarding/main/webview/sea_analysis_detail 5개 route 존재 |
 | `CrawlingCurrentTemperatureScreen.kt` | ✅ 완성 | OceanSelect Sheet 연결 완료 |
 | `CurrentTemperatureScreen.kt` | ✅ 완성 | OceanSelect Sheet 연결 완료 |
@@ -75,56 +75,45 @@
 | `SeaAnalysisScreen.kt` | ✅ 완성 | MainTab 연결, onNavigateToDetail 콜백 연결 완료 |
 | `SeaRegionListScreen.kt` | ✅ 완성 | ModalBottomSheet + SeaRegionRowView 구현 완료 |
 | `SeaAnalysisDetailScreen.kt` | ✅ 완성 | Canvas 꺾은선 그래프 + 수온 카드 3열 + Footer 구현 완료 |
-| `FishingRecordScreen.kt` | 🔴 미구현 | ← **현재 작업** |
-| `HistoryScreen.kt` | 🔴 미구현 | |
+| `FishingRecordScreen.kt` | ✅ 완성 | GoogleMap 기반. 경로선/마커/사진마커/팝업 전체 구현 완료 |
+| `HistoryScreen.kt` | 🔴 미구현 | ← **다음 작업** |
 | `HistoryDetailScreen.kt` | 🔴 미구현 | |
 | `HistoryImageViewer.kt` | 🔴 미구현 | |
 
 ---
 
-## 🔨 현재 작업: FishingRecordScreen
+## ✅ 완료된 작업: FishingRecordScreen (2026-03-25)
+
+### 구현 완료 항목
+- GoogleRecordMapView (AndroidView 래핑) + 경로선 / 상태마커 / 사진마커 지도 드로잉
+- TopInfoBar: 상태 Dot + 상태 텍스트 + 속도 + knots/km/h 단위 토글 + 저장 지점 수
+- MapControlButtons: 줌인 / 줌아웃 / 내 위치
+- BottomControlBar: 안내 텍스트(대기 중) + 녹화 버튼(중앙) + 카메라 버튼(우측)
+- 권한 처리: 위치(1차 거부 Rationale / 영구 거부 설정 안내), 카메라 동일 패턴
+- 팝업: 기록 중단 확인 / 위치 권한 / 카메라 권한
+
+### 버그 수정 이력
+- `loadPhotoMarkerBitmap`: px 고정 → dp→px 변환 (density 반영), DST_IN 클리핑 버그를 `canvas.clipPath()`로 교체, Aspect Fill 추가
+- `LocationTrackingService`: `setWaitForAccurateLocation(false)`, `firstOrNull` → `lastOrNull`, `MainLooper` → `HandlerThread` 분리
+- 경로선 드로잉: `LaunchedEffect(uiState.currentMapLine)` → `LaunchedEffect(viewModel)` + `mapLineEvents SharedFlow` 직접 구독 (백그라운드 복귀 시 경로 점프 선 해결)
+
+---
+
+## 🔨 다음 작업: HistoryScreen
 
 ### iOS 참고 파일
-- `Presentation/FishingRecord/View/FishingRecordView.swift` — 메인 화면
-- `Presentation/FishingRecord/View/Components/RecordMapView.swift` — Apple Map (MKMapView) 래핑
-- `Presentation/FishingRecord/View/Components/RecordKakaoMapView.swift` — Kakao Map 래핑
+- `Presentation/History/View/HistoryView.swift` — 조과 기록 목록
+- `Presentation/History/View/HistoryRecordCardView.swift` — 목록 카드 컴포넌트
+- `Presentation/History/View/HistoryImageViewer.swift` — 풀스크린 사진 뷰어
+- `Presentation/History/View/Components/HistoryKakaoMapViewController.swift` — 상세 지도
 
-### 화면 구조 (iOS 기준)
+### 구현 세부 단계
 ```
-Box (ZStack)
-  ├── 지도 레이어 (mapType에 따라 KakaoMap 또는 GoogleMap)
-  └── 오버레이 레이어 (Box)
-        ├── TopInfoBar (상단 좌측)
-        │     상태Dot + 상태텍스트 + [속도 + 단위토글(knots/km/h)] + 저장지점수
-        ├── MapControlButtons (우측 중단)
-        │     줌인 / 줌아웃 / 내위치
-        └── BottomControlBar (하단 중앙)
-              [안내텍스트 - 녹화 전만] + 녹화버튼(중앙) + 카메라버튼(우측)
-팝업 (Overlay)
-  ├── 기록 중단 확인 팝업
-  ├── 위치 권한 요청 팝업
-  └── 카메라 권한 요청 팝업
-```
-
-### 필요한 이미지 에셋
-iOS 에셋(`SeaThermo_iOS/.../FishingRecord/`) → Android 밀도별 변환 필요:
-- `btn_zoom_in` / `btn_zoom_out` / `btn_my_location` — 지도 컨트롤
-- `btn_record_play` / `btn_record_stop` — 녹화 버튼
-- `btn_camera` — 카메라 버튼
-- `ic_map_marker_blue` / `ic_map_marker_orange` / `ic_map_marker_red` — 지도 상태 마커
-
-### 구현 세부 단계 (순서대로 진행)
-```
-Step 1: 이미지 에셋 변환 (iOS @2x/@3x → Android 밀도별 폴더)
-Step 2: FishingRecordScreen 기본 레이아웃 (지도 placeholder + 오버레이 UI)
-Step 3: TopInfoBar 구현 (상태 표시, 속도, 단위 토글)
-Step 4: MapControlButtons + BottomControlBar 구현
-Step 5: 권한 처리 (위치 권한 런타임 요청)
-Step 6: 카메라 연동 (사진 촬영 / ActivityResultLauncher)
-Step 7: 지도 AndroidView 래핑 (GoogleMapView 또는 KakaoMapView)
-Step 8: 지도에 경로선/마커 그리기 (polyline + annotation)
-Step 9: 팝업 구현 (기록 중단, 권한 안내)
-Step 10: MainTabScreen 연결 + 빌드 확인
+Step 1: HistoryScreen — 기록 목록 (LazyColumn + HistoryRecordCardView)
+Step 2: HistoryDetailScreen — 상세 정보 (지도 + 경로 재생 + 통계)
+Step 3: HistoryImageViewer — 풀스크린 사진 뷰어
+Step 4: AppNavigation에 history_detail route 추가
+Step 5: MainTabScreen History Placeholder 제거 및 HistoryScreen 연결
 ```
 
 ---
@@ -136,6 +125,43 @@ Screen 구현 전 아래 키가 모두 설정되어 있는지 확인:
 ```
 RISA_API_KEY, API_BASE_URL, ONBADA_BASE_URL, GOOGLE_MAPS_KEY, KAKAO_APP_KEY
 ```
+
+### Row 내 가로 정렬 컴포넌트 세로 중앙 맞추기
+
+Row 안에 폰트 크기가 다른 Text나 Icon이 나란히 있을 때 세로 중앙이 어긋나 보이는 경우 아래 방법을 조합해서 사용한다.
+
+#### Text + Text (폰트 크기 다를 때)
+```kotlin
+Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Text(modifier = Modifier.alignByBaseline(), text = "2026.03.25", fontSize = 16.sp, ...)
+    Text(modifier = Modifier.alignByBaseline(), text = "•", fontSize = 16.sp, ...)
+    // 작은 텍스트가 시각적으로 아래로 처지면 graphicsLayer로 픽셀 단위 보정
+    Text(
+        modifier = Modifier.alignByBaseline().graphicsLayer { translationY = -2f },
+        text = "15:42 출발", fontSize = 14.sp, ...
+    )
+}
+```
+
+#### Icon + Text
+```kotlin
+Row(verticalAlignment = Alignment.CenterVertically) {
+    Icon(modifier = Modifier.size(14.dp).graphicsLayer { translationY = 1f }, ...)
+    Text(text = label, ...)
+}
+```
+
+#### 핵심 원칙
+| 방법 | Row 크기 영향 | 용도 |
+|------|-------------|------|
+| `alignByBaseline()` | 없음 | Text+Text 기본 정렬 |
+| `graphicsLayer { translationY = Xf }` | **없음** | 픽셀 단위 미세 보정 (드로우 단계만) |
+| `padding(top/bottom)` | **있음** (Row 확장됨) | ❌ 정렬 보정 용도로 사용 금지 |
+| `offset(y = X.dp)` | 없음이나 | dp 단위라 미세 조정 어려움 |
+
+> `graphicsLayer { translationY }`는 픽셀 단위(px)이고 레이아웃 측정에 전혀 영향을 주지 않으므로, Row/Column 크기를 유지하면서 픽셀 단위 보정이 필요할 때 사용한다.
+
+---
 
 ### async + launch 코루틴 예외 처리
 `viewModelScope.launch` 내부에서 `async`를 사용할 때 반드시 `supervisorScope { }` 로 감싸야 한다.

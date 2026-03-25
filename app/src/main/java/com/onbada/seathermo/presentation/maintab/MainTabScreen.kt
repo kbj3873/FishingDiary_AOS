@@ -37,6 +37,7 @@ import com.onbada.seathermo.presentation.fishingrecord.screen.FishingRecordScree
 import com.onbada.seathermo.presentation.fishingrecord.viewmodel.FishingRecordViewModel
 import com.onbada.seathermo.presentation.seaanalysis.screen.SeaAnalysisScreen
 import com.onbada.seathermo.infrastructure.webview.WebPage
+import com.onbada.seathermo.presentation.history.screen.HistoryTabNavHost
 import com.onbada.seathermo.presentation.setting.screen.SettingScreen
 import com.onbada.seathermo.presentation.setting.viewmodel.SettingViewModel
 
@@ -207,7 +208,7 @@ fun MainTabScreen(
                             )
                             FishingRecordScreen(viewModel = fishingRecordViewModel)
                         }
-                        TabItem.History -> PlaceholderScreen("히스토리")  // TODO: HistoryScreen
+                        TabItem.History -> HistoryTabNavHost(diContainer = diContainer)
                         TabItem.Settings -> {
                             val settingViewModel: SettingViewModel = viewModel(
                                 factory = diContainer.makeSettingViewModelFactory()

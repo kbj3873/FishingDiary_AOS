@@ -106,6 +106,9 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
+    // Coil (이미지 로딩 라이브러리 - 로컬 파일 경로에서 썸네일 로드에 사용)
+    implementation("io.coil-kt:coil-compose:2.7.0")
+
     // Google Play Services Location
     implementation("com.google.android.gms:play-services-location:21.0.1")
 

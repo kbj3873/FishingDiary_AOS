@@ -10,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Looper
 import androidx.core.app.NotificationCompat
@@ -40,7 +41,7 @@ class LocationTrackingService : Service() {
         // LocationRequest 설정
         private const val UPDATE_INTERVAL_MS = 1000L        // 1초마다 업데이트
         private const val FASTEST_INTERVAL_MS = 500L        // 최소 0.5초 간격
-        private const val SMALLEST_DISPLACEMENT_M = 5f      // 최소 5m 이동 시 업데이트
+        private const val SMALLEST_DISPLACEMENT_M = 1f      // 최소 1m 이동 시 업데이트
 
         /**
          * 서비스 시작
@@ -74,6 +75,12 @@ class LocationTrackingService : Service() {
     // NotificationManager
     private lateinit var notificationManager: NotificationManager
 
+    // 위치 콜백 전용 백그라운드 스레드.
+    // [개념] UI 스레드(MainLooper) 대신 별도 HandlerThread에서 위치 콜백을 처리합니다.
+    //        iOS의 CLLocationManager가 별도 큐에서 콜백을 처리하는 것과 동일한 이유입니다.
+    //        UI 스레드 부하 시 콜백 지연을 방지하여 위치 업데이트 누락을 줄입니다.
+    private lateinit var locationHandlerThread: HandlerThread
+
     override fun onCreate() {
         super.onCreate()
 
@@ -86,16 +93,22 @@ class LocationTrackingService : Service() {
         // Notification Channel 생성 (Android 8.0+)
         createNotificationChannel()
 
+        // 위치 콜백 전용 백그라운드 스레드 시작
+        locationHandlerThread = HandlerThread("LocationCallbackThread").also { it.start() }
+
         // LocationCallback 초기화
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult) {
                 super.onLocationResult(locationResult)
 
-                // 가장 정확한 위치 선택
-                val location = locationResult.locations.firstOrNull {
+                // 배치로 전달된 위치 중 가장 최신 유효 위치를 사용합니다.
+                // [개념] Android FusedLocationProvider는 여러 위치를 배치로 전달할 수 있습니다.
+                //        firstOrNull은 가장 오래된 위치를 선택하므로 lastOrNull이 올바릅니다.
+                //        iOS didUpdateLocations는 호출당 1개씩 전달하므로 이 차이가 없습니다.
+                val location = locationResult.locations.lastOrNull {
                     it.accuracy >= 0
                 } ?: return
-                
+
                 android.util.Log.d("Location Debug", "Service received location: ${location.latitude}, ${location.longitude}, accuracy=${location.accuracy}")
 
                 // FDLocationManager로 위치 전달
@@ -122,6 +135,15 @@ class LocationTrackingService : Service() {
 
         // 위치 업데이트 중지
         stopLocationUpdates()
+
+        // 백그라운드 스레드 종료
+        locationHandlerThread.quitSafely()
+
+        // 앱 종료 등으로 서비스가 소멸될 때 미저장 위치 데이터를 저장합니다.
+        // [개념] ForegroundService.onDestroy()는 앱 강제 종료 시에도 대부분 호출됩니다.
+        //        FDLocationManager.stopTracking()이 여기서 호출되지 않으면
+        //        locationList에 쌓인 마지막 데이터가 유실됩니다.
+        FDLocationManager.getInstance(applicationContext).stopTracking()
     }
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -191,14 +213,20 @@ class LocationTrackingService : Service() {
         ).apply {
             setMinUpdateIntervalMillis(FASTEST_INTERVAL_MS)
             setMinUpdateDistanceMeters(SMALLEST_DISPLACEMENT_M)
-            setWaitForAccurateLocation(true)
+            // [개념] setWaitForAccurateLocation(false): GPS 정확도가 낮아도 즉시 업데이트를 전달합니다.
+            //        true로 설정하면 충분한 정확도를 얻을 때까지 업데이트를 지연/스킵합니다.
+            //        iOS의 CLLocationManager는 정확도와 무관하게 계속 업데이트를 전달하며,
+            //        이것이 경로가 끊기지 않는 이유입니다. false가 iOS와 동일한 동작입니다.
+            setWaitForAccurateLocation(false)
         }.build()
 
-        // 위치 업데이트 요청
+        // 위치 업데이트 요청 (백그라운드 스레드 루퍼 사용)
+        // [개념] locationHandlerThread.looper를 사용하면 UI 스레드 부하와 무관하게
+        //        위치 콜백이 즉시 처리됩니다.
         fusedLocationClient.requestLocationUpdates(
             locationRequest,
             locationCallback,
-            Looper.getMainLooper()
+            locationHandlerThread.looper
         )
     }
 

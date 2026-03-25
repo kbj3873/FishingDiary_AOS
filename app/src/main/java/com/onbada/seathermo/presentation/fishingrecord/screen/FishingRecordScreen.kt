@@ -6,8 +6,6 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffXfermode
 import android.graphics.RectF
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -252,29 +250,39 @@ fun FishingRecordScreen(viewModel: FishingRecordViewModel) {
         }
     }
 
-    // 경로선 그리기: currentMapLine이 변경될 때마다 선분을 추가합니다.
-    // [개념] LaunchedEffect(key)는 key 값이 바뀔 때마다 재실행됩니다.
-    //        iOS의 RecordMapView.updateUIView에서 addPolyline()을 호출하는 것에 대응합니다.
-    LaunchedEffect(uiState.currentMapLine) {
-        val mapLine = uiState.currentMapLine ?: return@LaunchedEffect
-        val map = googleMap ?: return@LaunchedEffect
-        if (!uiState.isRecording) return@LaunchedEffect
+    // 경로선 그리기: mapLineEvents SharedFlow를 직접 구독합니다.
+    //
+    // [개념] 기존 LaunchedEffect(uiState.currentMapLine) 방식과의 차이:
+    //        - 기존: collectAsStateWithLifecycle()을 통해 uiState를 받음
+    //                → 앱이 백그라운드(Lifecycle STARTED 미만)일 때 수집 중단
+    //                → 복귀 시 마지막 1개 값만 처리 → 긴 점프 선 발생
+    //        - 신규: LaunchedEffect의 코루틴은 composable이 composition을 떠나기 전까지 유지됨
+    //                백그라운드로 내려도 코루틴은 계속 실행되므로 모든 경로 이벤트를 처리함
+    //        iOS의 UIViewRepresentable Coordinator가 라이프사이클 무관하게 동작하는 것과 동일합니다.
+    LaunchedEffect(viewModel) {
+        viewModel.mapLineEvents.collect { (mapLine, fishingState) ->
+            val map = googleMap ?: return@collect
+            if (!viewModel.uiState.value.isRecording) return@collect
 
-        val prevLat = mapLine.previousLocation.latitude
-        val prevLon = mapLine.previousLocation.longitude
-        val currLat = mapLine.currentLocation.latitude
-        val currLon = mapLine.currentLocation.longitude
+            val prevLat = mapLine.previousLocation.latitude
+            val prevLon = mapLine.previousLocation.longitude
+            val currLat = mapLine.currentLocation.latitude
+            val currLon = mapLine.currentLocation.longitude
 
-        // 유효한 좌표 (0,0이 아닌 경우)일 때만 경로선 추가
-        if (prevLat != 0.0 && prevLon != 0.0 && currLat != 0.0 && currLon != 0.0) {
-            val lineColor = stateLineColor(uiState.fishingState)
-            map.addPolyline(
-                PolylineOptions()
-                    .add(LatLng(prevLat, prevLon), LatLng(currLat, currLon))
-                    .width(8f)
-                    .color(lineColor.toArgb())
-                    .geodesic(false)
-            )
+            // 유효한 좌표 (0,0이 아닌 경우)일 때만 경로선 추가
+            if (prevLat != 0.0 && prevLon != 0.0 && currLat != 0.0 && currLon != 0.0) {
+                // [개념] fishingState는 이벤트 발행 시점의 상태값을 그대로 사용합니다.
+                //        uiState.fishingState를 여기서 읽으면 현재 상태(이미 변경됐을 수 있음)를
+                //        사용하게 되어 선분 색상이 잘못 적용될 수 있습니다.
+                val lineColor = stateLineColor(fishingState)
+                map.addPolyline(
+                    PolylineOptions()
+                        .add(LatLng(prevLat, prevLon), LatLng(currLat, currLon))
+                        .width(8f)
+                        .color(lineColor.toArgb())
+                        .geodesic(false)
+                )
+            }
         }
     }
 
@@ -352,6 +360,11 @@ fun FishingRecordScreen(viewModel: FishingRecordViewModel) {
         GoogleRecordMapView(
             modifier = Modifier.fillMaxSize(),
             onMapReady = { map ->
+                // [개념] GoogleRecordMapView의 update 블록이 리컴포지션마다 getMapAsync를 재호출하므로
+                //        onMapReady도 반복 실행됩니다. 이미 동일 인스턴스가 설정된 경우엔
+                //        초기화 코드를 건너뛰어 불필요한 재설정을 방지합니다.
+                if (googleMap == map) return@GoogleRecordMapView
+
                 googleMap = map
                 // 커스텀 UI를 사용하므로 기본 컨트롤 비활성화
                 map.uiSettings.isZoomControlsEnabled = false
@@ -986,9 +999,14 @@ private fun stateLineColor(fishingState: FDAppManager.FishingState): Color {
 /**
  * 사진 마커 Bitmap 생성.
  *
- * iOS의 photoAnnotationView() 렌더링 로직에 대응합니다.
+ * iOS의 generateThumbnail() 렌더링 로직에 대응합니다.
  * 썸네일 이미지를 48dp 정사각형으로 리사이즈하고,
  * 초록 테두리(#10B981, 3dp)와 둥근 모서리(10dp)를 적용합니다.
+ *
+ * [개념] Android Bitmap은 픽셀(px) 단위로 동작합니다.
+ *        iOS는 포인트(pt) + scale(2.0)으로 고밀도 이미지를 생성하지만,
+ *        Android는 dp 값에 화면 밀도(density)를 직접 곱해 px로 변환해야
+ *        동일한 물리적 크기로 마커가 표시됩니다.
  *
  * @param context 앱 Context
  * @param thumbnailPath Documents 디렉토리 기준 상대 경로
@@ -1000,44 +1018,63 @@ private fun loadPhotoMarkerBitmap(context: Context, thumbnailPath: String): Bitm
 
     val originalBitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return null
 
-    // 48px 정사각형으로 리사이즈 (Figma 기준 48dp)
-    val imageSize = 48
-    val borderWidth = 3
-    val cornerRadius = 10f
+    // [개념] dp → px 변환: density를 곱해야 화면 밀도에 관계없이 동일한 물리적 크기로 표시됩니다.
+    //        iOS의 format.scale = 2.0과 같은 역할입니다.
+    //        예) xxhdpi(density=3.0) 기기에서 48dp → 144px
+    val density = context.resources.displayMetrics.density
+    val imageSize = (48 * density).toInt()
+    val borderWidth = (3 * density).toInt()
+    val cornerRadius = 10f * density
     val totalSize = imageSize + borderWidth * 2
 
-    val resized = Bitmap.createScaledBitmap(originalBitmap, imageSize, imageSize, true)
     val result = Bitmap.createBitmap(totalSize, totalSize, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(result)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-    // 초록 테두리 배경 (Figma: #10B981)
-    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.parseColor("#10B981")
-    }
+    // 1단계: 초록 테두리 배경 전체 그리기 (Figma: #10B981)
+    paint.color = android.graphics.Color.parseColor("#10B981")
     canvas.drawRoundRect(
         RectF(0f, 0f, totalSize.toFloat(), totalSize.toFloat()),
         cornerRadius + borderWidth,
         cornerRadius + borderWidth,
-        borderPaint
+        paint
     )
 
-    // 썸네일 이미지 (둥근 모서리로 클리핑)
+    // 2단계: 이미지 영역을 둥근 사각형으로 클리핑 후 Aspect Fill 방식으로 그리기.
+    // [개념] canvas.save() / clipPath() / restore() 패턴은 iOS의 clipPath.addClip()에 대응합니다.
+    //        클리핑 범위를 imageRect로 제한하므로 초록 테두리 영역은 영향받지 않습니다.
+    //        이전 DST_IN 방식은 테두리까지 투명하게 만드는 버그가 있었습니다.
     val imageRect = RectF(
         borderWidth.toFloat(), borderWidth.toFloat(),
         (borderWidth + imageSize).toFloat(), (borderWidth + imageSize).toFloat()
     )
-    val clipPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        // DST_IN: 클리핑 마스크 역할
-        xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+
+    canvas.save()
+    // 이미지 영역만 둥근 사각형으로 클리핑
+    val clipPath = android.graphics.Path().apply {
+        addRoundRect(imageRect, cornerRadius, cornerRadius, android.graphics.Path.Direction.CW)
     }
-    // 먼저 이미지 그리기
-    canvas.drawBitmap(resized, null, imageRect, null)
-    // 둥근 사각형 마스크로 클리핑
-    val maskBitmap = Bitmap.createBitmap(totalSize, totalSize, Bitmap.Config.ARGB_8888)
-    val maskCanvas = Canvas(maskBitmap)
-    val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    maskCanvas.drawRoundRect(imageRect, cornerRadius, cornerRadius, maskPaint)
-    canvas.drawBitmap(maskBitmap, 0f, 0f, clipPaint)
+    canvas.clipPath(clipPath)
+
+    // Aspect Fill: iOS의 max(widthRatio, heightRatio) 로직과 동일합니다.
+    // [개념] scaledToFill과 같이 짧은 변 기준으로 확대하여 여백 없이 채웁니다.
+    val srcWidth = originalBitmap.width.toFloat()
+    val srcHeight = originalBitmap.height.toFloat()
+    val dstSize = imageSize.toFloat()
+    val scale = maxOf(dstSize / srcWidth, dstSize / srcHeight)
+    val drawnWidth = srcWidth * scale
+    val drawnHeight = srcHeight * scale
+    val drawnX = imageRect.left + (dstSize - drawnWidth) / 2f
+    val drawnY = imageRect.top + (dstSize - drawnHeight) / 2f
+
+    paint.reset()
+    canvas.drawBitmap(
+        originalBitmap,
+        null,
+        RectF(drawnX, drawnY, drawnX + drawnWidth, drawnY + drawnHeight),
+        paint
+    )
+    canvas.restore()
 
     return result
 }

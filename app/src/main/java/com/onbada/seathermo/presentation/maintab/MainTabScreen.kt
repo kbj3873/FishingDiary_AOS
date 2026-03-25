@@ -17,13 +17,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
@@ -75,6 +75,21 @@ fun MainTabScreen(
     //        마지막으로 선택된 탭(수온분석=1)이 유지됩니다.
     //        iOS의 @State는 뷰가 살아있는 동안 상태를 유지하는 것과 동일한 효과입니다.
     var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
+
+    // 방문한 탭 인덱스 집합 — 최초 방문 시에만 Composable을 생성하고 이후 재사용합니다.
+    // [개념] rememberSaveable로 화면 회전 시에도 방문 이력이 복원됩니다.
+    //        초기값에 selectedTabIndex를 포함하여 복원된 탭도 즉시 렌더링합니다.
+    //        List<Int>는 Bundle에 저장 가능한 타입입니다.
+    var visitedTabIndices by rememberSaveable { mutableStateOf(listOf(selectedTabIndex)) }
+
+    // 탭 전환 시 해당 인덱스를 방문 목록에 추가합니다.
+    // [개념] LaunchedEffect(selectedTabIndex)는 selectedTabIndex가 바뀔 때마다 실행됩니다.
+    //        한 번 추가된 탭은 제거되지 않으므로 Composable이 유지됩니다.
+    LaunchedEffect(selectedTabIndex) {
+        if (selectedTabIndex !in visitedTabIndices) {
+            visitedTabIndices = visitedTabIndices + selectedTabIndex
+        }
+    }
 
     val tabItems = listOf(
         TabItem.CurrentTemperature,
@@ -144,47 +159,65 @@ fun MainTabScreen(
     ) { paddingValues ->
         // 하단 탭 바 높이를 제외한 영역에 콘텐츠 배치
         Box(modifier = Modifier.padding(paddingValues)) {
-            // 선택된 탭에 따라 다른 화면을 표시합니다.
-            // [개념] when 절을 통해 선택된 인덱스에 맞는 Composable을 노출합니다.
-            //        Swift의 switch case 문과 동일한 제어문입니다.
-            when (tabItems[selectedTabIndex]) {
-                TabItem.CurrentTemperature -> {
-                    // [개념] viewModel(factory = ...)은 DI 컨테이너의 팩토리로 ViewModel을 생성합니다.
-                    //        Crawling 버전을 사용합니다: RISA OpenAPI 대신 risaInfo API 병렬 호출 방식.
-                    val crawlingViewModel: CrawlingCurrentTemperatureViewModel = viewModel(
-                        factory = diContainer.makeCrawlingCurrentTemperatureViewModelFactory()
-                    )
-                    CrawlingCurrentTemperatureScreen(
-                        viewModel = crawlingViewModel,
-                        diContainer = diContainer
-                    )
-                }
-                TabItem.Analysis -> SeaAnalysisScreen(
-                    diContainer = diContainer,
-                    onNavigateToDetail = { _, stationCode ->
-                        // seaAreaId는 stationCode로 Region을 조회할 수 있으므로 무시합니다.
-                        onNavigateToSeaAnalysisDetail(stationCode)
+
+            // 탭 렌더링 전략: Lazy + Persistent
+            // [개념] iOS의 TabView는 처음 진입한 탭만 생성하고 이후 전환 시 재사용합니다.
+            //        여기서도 동일하게 구현합니다:
+            //        1. 아직 방문하지 않은 탭(visitedTabIndices에 없는)은 Composition에 포함하지 않음
+            //           → 앱 시작 시 미방문 탭의 부수 효과(GPS 등)가 발생하지 않음
+            //        2. 한 번 방문한 탭은 숨겨져도 Composition에 계속 유지
+            //           → 탭 복귀 시 지도/경로/타이머 등 상태가 보존됨
+            //        3. ViewModel은 탭 블록 안에서 생성 → 방문 시점에 최초 1회 생성 후 재사용
+            tabItems.forEachIndexed { index, item ->
+                // 아직 방문하지 않은 탭은 Composition에 포함하지 않습니다.
+                if (index !in visitedTabIndices) return@forEachIndexed
+
+                val isVisible = selectedTabIndex == index
+
+                // [개념] alpha(0f)는 화면을 투명하게 만들지만 Composable은 Composition에 유지됩니다.
+                //        zIndex로 선택된 탭을 항상 최상단에 배치하여 터치 이벤트를 가장 먼저 처리합니다.
+                //        숨겨진 탭은 선택된 탭 아래에 깔리므로 터치를 가로채지 않습니다.
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .alpha(if (isVisible) 1f else 0f)
+                        .zIndex(if (isVisible) 1f else 0f)
+                ) {
+                    // [개념] viewModel()은 탭 블록 안에 위치하므로 해당 탭 최초 방문 시점에 생성됩니다.
+                    //        Composable이 Composition에 남아 있는 한 동일 인스턴스가 재사용됩니다.
+                    when (item) {
+                        TabItem.CurrentTemperature -> {
+                            val crawlingViewModel: CrawlingCurrentTemperatureViewModel = viewModel(
+                                factory = diContainer.makeCrawlingCurrentTemperatureViewModelFactory()
+                            )
+                            CrawlingCurrentTemperatureScreen(
+                                viewModel = crawlingViewModel,
+                                diContainer = diContainer
+                            )
+                        }
+                        TabItem.Analysis -> SeaAnalysisScreen(
+                            diContainer = diContainer,
+                            onNavigateToDetail = { _, stationCode ->
+                                onNavigateToSeaAnalysisDetail(stationCode)
+                            }
+                        )
+                        TabItem.FishingRecord -> {
+                            val fishingRecordViewModel: FishingRecordViewModel = viewModel(
+                                factory = diContainer.makeFishingRecordViewModelFactory()
+                            )
+                            FishingRecordScreen(viewModel = fishingRecordViewModel)
+                        }
+                        TabItem.History -> PlaceholderScreen("히스토리")  // TODO: HistoryScreen
+                        TabItem.Settings -> {
+                            val settingViewModel: SettingViewModel = viewModel(
+                                factory = diContainer.makeSettingViewModelFactory()
+                            )
+                            SettingScreen(
+                                viewModel = settingViewModel,
+                                onNavigateToWebPage = onNavigateToWebPage
+                            )
+                        }
                     }
-                )
-                TabItem.FishingRecord -> {
-                    // [개념] FishingRecordViewModel은 AndroidViewModel이므로 Application Context가 필요합니다.
-                    //        provideFactory()로 Application과 UseCase를 주입합니다.
-                    val fishingRecordViewModel: FishingRecordViewModel = viewModel(
-                        factory = diContainer.makeFishingRecordViewModelFactory()
-                    )
-                    FishingRecordScreen(viewModel = fishingRecordViewModel)
-                }
-                TabItem.History -> PlaceholderScreen("히스토리")              // TODO: HistoryScreen
-                TabItem.Settings -> {
-                    // [개념] viewModel(factory = ...)은 DI 컨테이너의 팩토리로 ViewModel을 생성합니다.
-                    //        FDAppManager 싱글턴을 통해 앱 전역 지도 타입 설정을 관리합니다.
-                    val settingViewModel: SettingViewModel = viewModel(
-                        factory = diContainer.makeSettingViewModelFactory()
-                    )
-                    SettingScreen(
-                        viewModel = settingViewModel,
-                        onNavigateToWebPage = onNavigateToWebPage
-                    )
                 }
             }
         }

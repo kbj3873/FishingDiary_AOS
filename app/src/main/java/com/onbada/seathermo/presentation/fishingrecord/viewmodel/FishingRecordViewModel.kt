@@ -14,8 +14,11 @@ import com.onbada.seathermo.managers.FDLocationManager
 import com.onbada.seathermo.utility.LocationPermissionHelper
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
@@ -37,17 +40,36 @@ class FishingRecordViewModel(
     private val _uiState = MutableStateFlow(FishingRecordUiState())
     val uiState: StateFlow<FishingRecordUiState> = _uiState.asStateFlow()
 
+    // 경로선 이벤트 스트림.
+    // [개념] StateFlow 대신 SharedFlow를 사용하는 이유:
+    //        경로선은 화면에서 LaunchedEffect로 직접 구독(collectAsStateWithLifecycle 미사용)합니다.
+    //        LaunchedEffect의 코루틴은 앱이 백그라운드 상태여도 계속 실행되므로,
+    //        백그라운드 중 발생한 모든 위치 이벤트를 누락 없이 지도에 그릴 수 있습니다.
+    //        extraBufferCapacity = 500: 구독자가 일시 처리 지연 시 최대 500개 이벤트를 버퍼링합니다.
+    //        Pair<MapLineInfo, FishingState>로 선분과 색상 정보를 함께 전달합니다.
+    private val _mapLineEvents = MutableSharedFlow<Pair<MapLineInfo, FDAppManager.FishingState>>(
+        extraBufferCapacity = 500
+    )
+    val mapLineEvents: SharedFlow<Pair<MapLineInfo, FDAppManager.FishingState>> = _mapLineEvents.asSharedFlow()
+
     private val locationManager = FDLocationManager.getInstance(application)
     
     // 비동기 작업 관리용 (타이머 등)
     private var timerJob: Job? = null
     private var locationSubscriptionJob: Job? = null
 
-    // 이전 상태 추적 및 스로틀링용
+    // 이전 확정 상태 추적
     private var lastFishingState: FDAppManager.FishingState? = null
     private var currentSessionId: String = ""
     private var lastSavedTime: Long = 0
     private val saveIntervalMs: Long = 3000 // 3초 간격 자동 저장
+
+    // 상태 변경 debounce: 동일한 후보 상태가 연속 N회 측정되어야 상태를 확정합니다.
+    // [이유] GPS 속도는 순간적으로 임계값을 넘나들 수 있어 단일 측정만으로 상태를 바꾸면
+    //        빠른 진동으로 불필요한 마커가 과도하게 생성됩니다.
+    private var pendingState: FDAppManager.FishingState? = null
+    private var pendingStateCount: Int = 0
+    private val stateConfirmThreshold: Int = 3 // 3회 연속 같은 상태여야 확정
 
     /**
      * 위치 업데이트 구독 시작.
@@ -81,10 +103,25 @@ class FishingRecordViewModel(
         val speedKnots = speedMps * 1.94384 // knots 변환
         
         // 2. 낚시 상태 판별 (속도 기준)
-        val newState = when {
+        val candidateState = when {
             speedKnots >= FDAppManager.SPEED_THRESHOLD_HIGH -> FDAppManager.FishingState.MOVING
             speedKnots >= FDAppManager.SPEED_THRESHOLD_LOW -> FDAppManager.FishingState.DRIFTING
             else -> FDAppManager.FishingState.FISHING
+        }
+
+        // 2-1. 상태 debounce: 후보 상태가 stateConfirmThreshold 회 연속 측정되어야 확정합니다.
+        // [이유] GPS 속도는 순간적으로 임계값을 넘나들 수 있어, 단일 측정으로 상태를 바꾸면
+        //        빠른 진동(FISHING→DRIFTING→FISHING)으로 불필요한 마커가 과도하게 생성됩니다.
+        if (candidateState == pendingState) {
+            pendingStateCount++
+        } else {
+            pendingState = candidateState
+            pendingStateCount = 1
+        }
+        // 아직 확정되지 않은 경우 UI 속도/거리만 최신값으로 유지하고 상태 처리를 건너뜁니다.
+        val confirmedState = if (pendingStateCount >= stateConfirmThreshold) candidateState else {
+            // 현재 확정 상태(lastFishingState)를 유지하되, 최초 기록 시작 직후에는 candidateState 사용
+            lastFishingState ?: candidateState
         }
 
         // 3. 거리 계산 (이전 지점과의 거리 누적)
@@ -93,31 +130,36 @@ class FishingRecordViewModel(
             distanceDelta = currentLocation.distanceTo(prevLocation).toDouble() / 1000.0 // km 단위
         }
 
-        // 4. 상태 변경 감지 및 마커 추가
-        if (lastFishingState != null && lastFishingState != newState) {
-            // 변곡점(이전 좌표)에 마커 생성
-            val markerCoord = if (prevLocation.latitude != 0.0) prevLocation else currentLocation
+        // 4. 상태 변경 감지 및 마커 추가 (확정된 상태 기준)
+        if (lastFishingState != null && lastFishingState != confirmedState && pendingStateCount >= stateConfirmThreshold) {
+            // prevLocation → currentLocation 세그먼트가 confirmedState 색으로 그려지므로
+            // 마커는 해당 세그먼트의 시작점 prevLocation에 찍습니다.
+            // prevLocation이 유효하지 않으면(0,0) currentLocation으로 폴백합니다.
+            val markerLat = if (prevLocation.latitude != 0.0) prevLocation.latitude else currentLocation.latitude
+            val markerLon = if (prevLocation.longitude != 0.0) prevLocation.longitude else currentLocation.longitude
             val marker = StateChangeMarker(
-                latitude = markerCoord.latitude,
-                longitude = markerCoord.longitude,
-                state = newState
+                latitude = markerLat,
+                longitude = markerLon,
+                state = confirmedState
             )
-            
+
             _uiState.update { it.copy(
                 markers = it.markers + marker,
                 savedPointCount = it.savedPointCount + 1
             )}
-            
+
             // 상태 변경 순간 지점 저장
             useCase.savePoint(
                 sessionId = currentSessionId,
                 latitude = currentLocation.latitude,
                 longitude = currentLocation.longitude,
                 speed = speedKnots.toDouble(),
-                state = newState.value
+                state = confirmedState.value
             )
         }
-        lastFishingState = newState
+        if (pendingStateCount >= stateConfirmThreshold) {
+            lastFishingState = confirmedState
+        }
 
         // 5. 주기적 자동 저장 (3초 간격)
         val currentTime = System.currentTimeMillis()
@@ -127,19 +169,24 @@ class FishingRecordViewModel(
                 latitude = currentLocation.latitude,
                 longitude = currentLocation.longitude,
                 speed = speedKnots.toDouble(),
-                state = newState.value
+                state = confirmedState.value
             )
             lastSavedTime = currentTime
         }
 
-        // 6. UI 상태 최종 업데이트
+        // 6. UI 상태 최종 업데이트 (확정된 상태 기준으로 경로 색상 및 UI 반영)
         _uiState.update { it.copy(
             currentSpeed = speedKnots.toDouble(),
-            fishingState = newState,
+            fishingState = confirmedState,
             distance = it.distance + distanceDelta,
-            currentLocation = currentLocation,
-            currentMapLine = mapLine
+            currentLocation = currentLocation
         )}
+
+        // 7. 경로선 이벤트 발행 (지도 드로잉용 SharedFlow).
+        // [개념] tryEmit은 버퍼에 공간이 있으면 즉시 emit하는 non-suspending 함수입니다.
+        //        viewModelScope 코루틴 안에서 직접 emit 가능합니다.
+        //        uiState 업데이트와 분리하여 백그라운드에서도 모든 경로 이벤트를 전달합니다.
+        _mapLineEvents.tryEmit(mapLine to confirmedState)
     }
 
     /**
@@ -153,6 +200,8 @@ class FishingRecordViewModel(
 
         currentSessionId = UUID.randomUUID().toString()
         lastFishingState = null
+        pendingState = null
+        pendingStateCount = 0
         lastSavedTime = System.currentTimeMillis()
         
         _uiState.update { it.copy(
@@ -303,7 +352,6 @@ data class FishingRecordUiState(
     val distance: Double = 0.0,
     val duration: Long = 0,
     val currentLocation: Location? = null,
-    val currentMapLine: MapLineInfo? = null,
     val markers: List<StateChangeMarker> = emptyList(),
     val photoMarkers: List<PhotoMarker> = emptyList(),
     val savedImagePaths: List<String> = emptyList(),

@@ -215,10 +215,16 @@ class FishingRecordViewModel(
 
         locationManager.startTracking()
         startTimer()
-        
-        // 초기 시작 지점 저장
+
+        // 초기 시작 지점 저장 — GPS가 확정된 경우에만 저장합니다.
+        // [이유] locationManager의 초기값은 createDummyLocation(0.0, 0.0)으로,
+        //        GPS 업데이트 수신 전에 읽으면 위도/경도 0.0(아프리카 기니만)이 저장됩니다.
+        //        유효하지 않은 경우 건너뜁니다. 이후 processLocationUpdate에서
+        //        3초 간격 자동 저장이 첫 실제 GPS 지점을 저장합니다.
         locationManager.currentMapLine.value.currentLocation.let { loc ->
-            useCase.savePoint(currentSessionId, loc.latitude, loc.longitude, 0.0, 0)
+            if (loc.latitude != 0.0 || loc.longitude != 0.0) {
+                useCase.savePoint(currentSessionId, loc.latitude, loc.longitude, 0.0, 0)
+            }
         }
     }
 
@@ -226,9 +232,11 @@ class FishingRecordViewModel(
      * 기록 중단.
      */
     fun stopRecording() {
-        // 종료 지점 저장
+        // 종료 지점 저장 — 유효한 GPS 좌표인 경우에만 저장합니다.
         val loc = _uiState.value.currentLocation ?: locationManager.currentMapLine.value.currentLocation
-        useCase.savePoint(currentSessionId, loc.latitude, loc.longitude, 0.0, _uiState.value.fishingState.value)
+        if (loc.latitude != 0.0 || loc.longitude != 0.0) {
+            useCase.savePoint(currentSessionId, loc.latitude, loc.longitude, 0.0, _uiState.value.fishingState.value)
+        }
 
         _uiState.update { it.copy(
             isRecording = false,
@@ -241,13 +249,16 @@ class FishingRecordViewModel(
 
     /**
      * 사진 저장.
+     *
+     * [개념] TakePicture 계약으로 카메라가 filesDir에 직접 파일을 저장하므로,
+     *        ByteArray 대신 파일명(fileName)만 받아 UseCase로 전달합니다.
      */
-    fun savePhoto(imageData: ByteArray) {
+    fun savePhoto(fileName: String) {
         val loc = _uiState.value.currentLocation ?: return
         val geoPoint = GeoPoint(loc.latitude, loc.longitude)
         val state = _uiState.value.fishingState.value
 
-        val path = useCase.savePhoto(currentSessionId, imageData, geoPoint, state)
+        val path = useCase.savePhoto(currentSessionId, fileName, geoPoint, state)
         if (path != null) {
             val photoMarker = PhotoMarker(
                 latitude = loc.latitude,

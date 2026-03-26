@@ -107,15 +107,20 @@ fun HistoryTabNavHost(
             )
         }
         // 히스토리 상세 화면
+        // HistoryImageViewer는 HistoryDetailScreen 내부에서 Dialog로 처리되므로
+        // 별도 Navigation Route가 필요 없습니다.
         composable("history_detail/{sessionId}") { backStackEntry ->
             val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
             HistoryDetailScreen(
-                sessionId = sessionId,
-                diContainer = diContainer,
-                onNavigateBack = { _ ->
+                sessionId       = sessionId,
+                diContainer     = diContainer,
+                onNavigateBack  = { shouldRefresh ->
+                    if (shouldRefresh) {
+                        // 목록 화면으로 돌아갈 때 데이터가 변경된 경우를 대비해
+                        // HistoryScreen의 LaunchedEffect(isVisible)이 자동으로 재로딩합니다.
+                    }
                     navController.popBackStack()
-                },
-                onImageClick = { /* TODO: HistoryImageViewer 연결 */ }
+                }
             )
         }
     }

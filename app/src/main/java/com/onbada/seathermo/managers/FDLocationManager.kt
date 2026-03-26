@@ -134,6 +134,15 @@ class FDLocationManager private constructor(private val context: Context) {
         sequenceNum = 0
         initLocation()
 
+        // currentMapLine 초기화.
+        // [이유] FDLocationManager는 싱글턴이므로 이전 세션의 마지막 위치가 _currentMapLine에 남아 있습니다.
+        //        초기화하지 않으면 startRecording()에서 이 값을 읽어 이전 세션 위치를
+        //        새 세션 첫 번째 지점으로 저장하는 버그가 발생합니다.
+        _currentMapLine.value = MapLineInfo(
+            previousLocation = createDummyLocation(0.0, 0.0),
+            currentLocation  = createDummyLocation(0.0, 0.0)
+        )
+
         // 권한 체크 (위치 권한만 필수, 알림 권한은 선택사항)
         if (!LocationPermissionHelper.hasLocationPermission(context)) {
             android.util.Log.e("Location Debug", "Starting tracking failed: Missing LOCATION permission")

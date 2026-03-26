@@ -213,11 +213,11 @@ class LocationTrackingService : Service() {
         ).apply {
             setMinUpdateIntervalMillis(FASTEST_INTERVAL_MS)
             setMinUpdateDistanceMeters(SMALLEST_DISPLACEMENT_M)
-            // [개념] setWaitForAccurateLocation(false): GPS 정확도가 낮아도 즉시 업데이트를 전달합니다.
-            //        true로 설정하면 충분한 정확도를 얻을 때까지 업데이트를 지연/스킵합니다.
-            //        iOS의 CLLocationManager는 정확도와 무관하게 계속 업데이트를 전달하며,
-            //        이것이 경로가 끊기지 않는 이유입니다. false가 iOS와 동일한 동작입니다.
-            setWaitForAccurateLocation(false)
+            // [개념] setWaitForAccurateLocation(true): GPS가 충분한 정확도를 확보한 후 첫 위치를 전달합니다.
+            //        false이면 Wi-Fi/기지국 기반의 저정확도 위치를 즉시 전달하여 경로가 튀는 현상이 발생합니다.
+            //        true로 설정하면 첫 위치 전달이 수 초 지연될 수 있으나, 이후 추적은 정상적으로 진행됩니다.
+            //        해상·야외 환경에서는 GPS 확보가 빠르므로 실용적 지연이 거의 없습니다.
+            setWaitForAccurateLocation(true)
         }.build()
 
         // 위치 업데이트 요청 (백그라운드 스레드 루퍼 사용)

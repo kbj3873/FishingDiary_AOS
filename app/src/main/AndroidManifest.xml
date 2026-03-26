@@ -67,6 +67,20 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="location" />
+
+        <!--
+            FileProvider: TakePicture(uri) 촬영 시 카메라 앱에 content:// URI를 안전하게 공유합니다.
+            TakePicturePreview(썸네일)가 아닌 고해상도 원본 저장을 위해 필요합니다.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

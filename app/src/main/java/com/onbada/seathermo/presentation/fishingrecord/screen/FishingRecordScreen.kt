@@ -63,8 +63,9 @@ import com.onbada.seathermo.presentation.fishingrecord.viewmodel.FishingRecordUi
 import com.onbada.seathermo.presentation.fishingrecord.viewmodel.FishingRecordViewModel
 import com.onbada.seathermo.presentation.fishingrecord.viewmodel.SpeedUnit
 import com.onbada.seathermo.utility.LocationPermissionHelper
-import java.io.ByteArrayOutputStream
+import androidx.core.content.FileProvider
 import java.io.File
+import java.util.UUID
 
 // ── 색상 정의 (Figma 기준) ──────────────────────────────────────────────────
 // 이동 중: 파랑 #2563EB
@@ -162,17 +163,19 @@ fun FishingRecordScreen(viewModel: FishingRecordViewModel) {
     }
 
     // 카메라 촬영 런처.
-    // [개념] TakePicturePreview는 촬영된 Bitmap을 결과로 반환합니다.
-    //        ViewModel이 ByteArray를 받으므로 Bitmap → JPEG ByteArray로 변환합니다.
-    //        iOS의 UIImagePickerController에 대응합니다.
+    // [개념] TakePicture는 FileProvider URI를 전달하면 카메라 앱이 직접 원본 해상도로 파일을 저장합니다.
+    //        TakePicturePreview와 달리 썸네일이 아닌 풀 해상도 이미지를 얻을 수 있습니다.
+    //        iOS의 UIImagePickerController + sourceType: .camera에 대응합니다.
+    //        촬영 직전에 생성한 파일명을 currentPhotoFileName에 저장해두고,
+    //        성공(true) 시 ViewModel에 전달합니다.
+    var currentPhotoFileName by remember { mutableStateOf("") }
     val cameraLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.TakePicturePreview()
-    ) { bitmap ->
-        bitmap?.let {
-            val stream = ByteArrayOutputStream()
-            it.compress(Bitmap.CompressFormat.JPEG, 80, stream)
-            viewModel.savePhoto(stream.toByteArray())
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && currentPhotoFileName.isNotEmpty()) {
+            viewModel.savePhoto(currentPhotoFileName)
         }
+        currentPhotoFileName = ""
     }
 
     // 지도에 이미 그려진 마커/사진마커 개수 추적 (새로 추가된 것만 그리기 위해 사용)
@@ -453,7 +456,18 @@ fun FishingRecordScreen(viewModel: FishingRecordViewModel) {
                         Manifest.permission.CAMERA
                     ) == android.content.pm.PackageManager.PERMISSION_GRANTED
                     if (hasCameraPermission) {
-                        cameraLauncher.launch(null)
+                        // [개념] TakePicture는 촬영 전에 저장할 파일 URI를 미리 지정합니다.
+                        //        FileProvider는 앱 외부(카메라 앱)에 filesDir 경로를 content:// URI로 안전하게 공유합니다.
+                        //        iOS의 PHPhotoLibrary.requestAuthorization 없이 filesDir에 직접 저장하는 것과 동일합니다.
+                        val fileName = "${UUID.randomUUID()}.jpg"
+                        val photoFile = File(context.filesDir, fileName)
+                        val photoUri = FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            photoFile
+                        )
+                        currentPhotoFileName = fileName
+                        cameraLauncher.launch(photoUri)
                     } else {
                         cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                     }
@@ -1013,8 +1027,12 @@ private fun stateLineColor(fishingState: FDAppManager.FishingState): Color {
  * @return 마커용 Bitmap (파일 없으면 null)
  */
 private fun loadPhotoMarkerBitmap(context: Context, thumbnailPath: String): Bitmap? {
-    val file = File(context.filesDir, thumbnailPath)
-    if (!file.exists()) return null
+    // 썸네일(uuid_thumb.jpg)을 우선 로드합니다. 없으면 원본(uuid.jpg)으로 폴백합니다.
+    // [이유] 기존 레코드(업데이트 이전)에는 uuid_thumb.jpg가 없으므로 폴백이 필요합니다.
+    val thumbPath = thumbnailPath.removeSuffix(".jpg") + "_thumb.jpg"
+    val file = File(context.filesDir, thumbPath).takeIf { it.exists() }
+        ?: File(context.filesDir, thumbnailPath).takeIf { it.exists() }
+        ?: return null
 
     val originalBitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return null
 

@@ -39,23 +39,24 @@ interface FishingRecordRepository {
     )
 
     /**
-     * 사진을 저장하고 저장된 파일 경로를 반환합니다.
+     * 카메라가 저장한 원본 파일(fileName)로부터 썸네일을 생성하고 DB에 기록합니다.
      *
-     * [개념] iOS의 Data → Android ByteArray.
+     * [개념] TakePicture 계약은 카메라 앱이 직접 filesDir의 파일에 원본 이미지를 저장합니다.
+     *        따라서 ByteArray 전달이 불필요하며, 파일명만 전달받아 처리합니다.
      *        iOS의 (Double, Double) tuple → Android GeoPoint data class.
-     *        Kotlin에는 tuple이 없어 두 값을 묶는 data class를 사용합니다.
      *
      * @param sessionId 낚시 세션 식별자.
-     * @param imageData 저장할 이미지 바이트 데이터.
+     * @param fileName  카메라가 저장한 원본 파일명 (filesDir 기준, e.g. "uuid.jpg").
+     *                  구현체에서 "uuid_thumb.jpg" 썸네일을 파생 생성합니다.
      * @param timestamp 촬영 시각 (Unix timestamp, milliseconds).
-     * @param location 촬영 위치 (위도, 경도).
-     * @param state 포인트 상태.
-     * @return 저장된 이미지 파일 경로. 저장 실패 시 null.
+     * @param location  촬영 위치 (위도, 경도).
+     * @param state     포인트 상태.
+     * @return 원본 파일명. 저장 실패 시 null.
      *         [개념] String? 는 nullable 타입입니다. Swift의 String?와 동일합니다.
      */
     fun savePhoto(
         sessionId: String,
-        imageData: ByteArray,
+        fileName: String,
         timestamp: Long,
         location: GeoPoint,
         state: Int

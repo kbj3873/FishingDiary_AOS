@@ -180,6 +180,108 @@ class HistoryDetailViewModel(
         _uiState.update { it.copy(shouldDismiss = true) }
     }
 
+    /**
+     * 마커 탭 시 호출. markerId로 어떤 마커가 선택됐는지 식별하여 selectedMarker를 업데이트합니다.
+     * iOS의 mapView(_:didSelect:) 내 parent.selectedMarker 할당 로직에 대응합니다.
+     */
+    fun selectMarker(markerId: String) {
+        val uiState = _uiState.value
+
+        // 사진 마커 우선 검색
+        val photoMarker = uiState.photoMarkers.firstOrNull { it.id == markerId }
+        if (photoMarker != null) {
+            _uiState.update { it.copy(
+                selectedMarker = SelectedMarkerInfo(
+                    title = photoMarker.title,
+                    timeString = photoMarker.timeString,
+                    thumbnailPath = photoMarker.thumbnailPath,
+                    state = null
+                )
+            )}
+            return
+        }
+
+        // 상태 마커 검색
+        val stateMarker = uiState.stateMarkers.firstOrNull { it.id == markerId }
+        if (stateMarker != null) {
+            _uiState.update { it.copy(
+                selectedMarker = SelectedMarkerInfo(
+                    title = stateMarker.title,
+                    timeString = stateMarker.timeString,
+                    thumbnailPath = null,
+                    state = stateMarker.state
+                )
+            )}
+        }
+    }
+
+    /**
+     * 하단 오버레이 카드를 닫습니다.
+     * iOS의 viewModel.selectedMarker = nil에 대응합니다.
+     */
+    fun clearSelectedMarker() {
+        _uiState.update { it.copy(selectedMarker = null) }
+    }
+
+    /**
+     * 이미지 뷰어를 엽니다.
+     * iOS의 viewModel.selectedImageIndex = index + isImageViewerPresented = true에 대응합니다.
+     */
+    fun openImageViewer(index: Int) {
+        _uiState.update { it.copy(selectedImageIndex = index, isImageViewerPresented = true) }
+    }
+
+    /**
+     * 이미지 뷰어를 닫습니다.
+     * iOS의 presentationMode.dismiss()에 대응합니다.
+     */
+    fun closeImageViewer() {
+        _uiState.update { it.copy(isImageViewerPresented = false) }
+    }
+
+    /**
+     * 뷰어에서 현재 보이는 사진 인덱스를 업데이트합니다.
+     * iOS의 viewModel.selectedImageIndex에 대응합니다.
+     */
+    fun setSelectedImageIndex(index: Int) {
+        _uiState.update { it.copy(selectedImageIndex = index) }
+    }
+
+    /**
+     * 이미지 뷰어에서 현재 표시 중인 사진을 삭제합니다.
+     * iOS의 deletePhoto(at:)에 대응합니다.
+     *
+     * 삭제 후 남은 사진이 없으면 뷰어를 닫습니다.
+     * iOS: markers.isEmpty → isImageViewerPresented = false
+     */
+    fun deletePhoto(at: Int) {
+        val currentMarkers = _uiState.value.photoMarkers
+        if (at < 0 || at >= currentMarkers.size) return
+
+        val marker = currentMarkers[at]
+
+        // [개념] deleteFishingRecord는 해당 record 전체(사진 포함)를 DB에서 삭제합니다.
+        //        iOS의 useCase.deleteFishingRecord(id: marker.recordId)에 대응합니다.
+        useCase.deleteFishingRecord(marker.recordId)
+
+        // UI 목록에서 제거 + 데이터 변경 플래그
+        val updatedMarkers = currentMarkers.toMutableList().also { it.removeAt(at) }
+
+        val newIndex = when {
+            updatedMarkers.isEmpty() -> 0
+            at >= updatedMarkers.size -> updatedMarkers.size - 1
+            else -> at
+        }
+
+        _uiState.update { it.copy(
+            photoMarkers          = updatedMarkers,
+            isDataModified        = true,
+            // 남은 사진 없으면 뷰어 닫기, 있으면 인덱스 조정
+            isImageViewerPresented = updatedMarkers.isNotEmpty(),
+            selectedImageIndex    = newIndex
+        )}
+    }
+
     companion object {
         fun provideFactory(
             sessionId: String,
@@ -208,7 +310,29 @@ data class HistoryDetailUiState(
     val stateMarkers: List<HistoryStateMarker> = emptyList(),
     val centerLatitude: Double = 37.5665,
     val centerLongitude: Double = 126.9780,
-    val shouldDismiss: Boolean = false
+    val shouldDismiss: Boolean = false,
+    // 마커 탭 시 하단 오버레이로 표시할 선택된 마커 정보.
+    // iOS의 viewModel.selectedMarker 프로퍼티에 대응합니다.
+    val selectedMarker: SelectedMarkerInfo? = null,
+    // 이미지 뷰어 상태. iOS의 isImageViewerPresented / selectedImageIndex에 대응합니다.
+    val isImageViewerPresented: Boolean = false,
+    val selectedImageIndex: Int = 0,
+    // 사진 삭제 등으로 데이터가 변경됐을 때 목록 갱신을 위한 플래그.
+    // iOS의 isDataModified에 대응합니다.
+    val isDataModified: Boolean = false
+)
+
+/**
+ * 마커 탭 시 하단 오버레이 카드에 표시할 정보.
+ * iOS의 HistoryDetailViewModel.SelectedMarkerInfo에 대응합니다.
+ *
+ * @param thumbnailPath null이면 상태 마커(stateMarkerCard), 아니면 사진 마커(photoMarkerCard)
+ */
+data class SelectedMarkerInfo(
+    val title: String,
+    val timeString: String,
+    val thumbnailPath: String?,  // null → 상태 마커, non-null → 사진 마커
+    val state: FDAppManager.FishingState?
 )
 
 data class GeoCoord(val latitude: Double, val longitude: Double)

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FileProvider 경로 설정.
+    context.filesDir 하위에 카메라 촬영 이미지를 임시 저장하기 위해 files-path를 선언합니다.
+    iOS의 FileManager.default.urls(for: .documentDirectory)에 대응합니다.
+-->
+<paths>
+    <files-path name="camera_photos" path="." />
+</paths>

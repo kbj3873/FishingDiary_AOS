@@ -56,13 +56,14 @@ interface FishingRecordUseCase {
     }
 
     /**
-     * 사진을 저장하고 저장된 파일 경로를 반환합니다.
+     * 카메라가 저장한 원본 파일명을 받아 썸네일 생성 및 DB 기록을 요청합니다.
      *
-     * @return 저장 경로. 실패 시 null.
+     * @param fileName 카메라가 filesDir에 저장한 원본 파일명 (e.g. "uuid.jpg").
+     * @return 원본 파일명. 실패 시 null.
      */
     fun savePhoto(
         sessionId: String,
-        imageData: ByteArray,
+        fileName: String,
         location: GeoPoint,
         state: Int
     ): String?
@@ -103,7 +104,7 @@ class DefaultFishingRecordUseCase(
 
     override fun savePhoto(
         sessionId: String,
-        imageData: ByteArray,
+        fileName: String,
         location: GeoPoint,
         state: Int
     ): String? {
@@ -111,10 +112,10 @@ class DefaultFishingRecordUseCase(
         //        iOS의 timestamp: Date()와 동일하게 호출 시점의 시각을 사용합니다.
         return repository.savePhoto(
             sessionId = sessionId,
-            imageData = imageData,
+            fileName  = fileName,
             timestamp = System.currentTimeMillis(),
-            location = location,
-            state = state
+            location  = location,
+            state     = state
         )
     }
 

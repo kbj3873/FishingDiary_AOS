@@ -33,6 +33,8 @@ class SettingViewModel(
     /**
      * 사용자가 선택한 지도 타입을 변경하고 AppManager에 저장합니다.
      *
+     * 낚시 기록 진행 중이면 변경을 차단하고 팝업 플래그를 설정합니다.
+     *
      * [개념] 지도 타입 변경은 앱 전역에 영향을 주는 설정이므로,
      *        ViewModel 내부 상태뿐 아니라 FDAppManager(Singleton)에도 즉시 반영합니다.
      *        Swift의 appManager.mapTp = type 할당 로직과 동일합니다.
@@ -42,16 +44,28 @@ class SettingViewModel(
     fun updateMapType(type: MapType) {
         if (type == _uiState.value.selectedMapType) return
 
+        // 낚시 기록 진행 중이면 변경 차단 후 팝업 표시
+        if (appManager.isRecording) {
+            _uiState.update { it.copy(showRecordingBlockedDialog = true) }
+            return
+        }
+
         // 1. UI 상태 업데이트 (Composable이 즉시 재그려짐)
         _uiState.update { it.copy(selectedMapType = type) }
-        
+
         // 2. 전역 매니저 상태 업데이트 (다른 화면 및 지도 컴포넌트에 반영)
-        // [참고] FDAppManager의 setMapType은 내부적으로 SharedPreferences 등에 저장 로직을 포함할 수 있습니다.
         val rawValue = when (type) {
             MapType.GOOGLE_MAP -> 0
             MapType.KAKAO_MAP -> 1
         }
         appManager.setMapType(rawValue)
+    }
+
+    /**
+     * 기록 중 지도 변경 차단 팝업을 닫습니다.
+     */
+    fun dismissRecordingBlockedDialog() {
+        _uiState.update { it.copy(showRecordingBlockedDialog = false) }
     }
 
     /**
@@ -85,7 +99,9 @@ class SettingViewModel(
  *        지도 타입 외에도 공지사항, 약관 등 메뉴 구성을 여기서 관리할 수 있습니다.
  */
 data class SettingUiState(
-    val selectedMapType: MapType = MapType.GOOGLE_MAP,
+    val selectedMapType: MapType = MapType.KAKAO_MAP,
+    // 낚시 기록 중 지도 변경 시도 시 표시할 차단 팝업 플래그
+    val showRecordingBlockedDialog: Boolean = false,
     val appVersion: String = "1.0.0", // TODO: BuildConfig에서 가져오도록 수정
     
     // 설정 메뉴 목록 (UI에서 리스트로 그릴 때 활용)

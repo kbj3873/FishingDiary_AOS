@@ -28,6 +28,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.onbada.seathermo.R
 import com.onbada.seathermo.application.di.ApplicationDIContainer
+import com.onbada.seathermo.domain.entity.MapType
+import com.onbada.seathermo.managers.FDAppManager
 import com.onbada.seathermo.presentation.common.components.CommonPopupOverlay
 import com.onbada.seathermo.presentation.common.components.PopupDestructiveColor
 import com.onbada.seathermo.presentation.history.viewmodel.HistoryDetailUiState
@@ -59,6 +61,13 @@ fun HistoryDetailScreen(
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // 지도 타입을 FDAppManager.mapTypeFlow로 실시간 구독합니다.
+    // [개념] 설정 탭에서 지도 타입을 변경하면 mapTypeFlow가 새 값을 방출합니다.
+    //        이 화면은 탭 전환 시 alpha로 숨겨져도 Composition에 계속 존재하므로
+    //        collectAsStateWithLifecycle()이 정상 작동합니다. 복귀 시 변경된 지도가 표시됩니다.
+    //        iOS의 isMapInitialized 없이 자동으로 재렌더링됩니다.
+    val currentMapType by FDAppManager.getInstance().mapTypeFlow.collectAsStateWithLifecycle()
+
     var showDeletePopup by remember { mutableStateOf(false) }
     var isExpanded by remember { mutableStateOf(false) }
 
@@ -74,16 +83,29 @@ fun HistoryDetailScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    // [개념] background(Color.Black)는 fadeOut 전환 중 지도(AndroidView)가 투명해질 때
+    //        빈 화면이 비치지 않도록 배경을 채웁니다.
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         // ── 1. 지도 배경 (전체 화면) ────────────────────────────────────────────
-        // iOS의 HistoryMapView / HistoryKakaoMapView에 대응합니다.
-        GoogleHistoryMapView(
-            polylines     = uiState.polylines,
-            stateMarkers  = uiState.stateMarkers,
-            photoMarkers  = uiState.photoMarkers,
-            onMarkerClick = { markerId -> viewModel.selectMarker(markerId) },
-            modifier      = Modifier.fillMaxSize()
-        )
+        // [개념] currentMapType에 따라 Google/Kakao 지도를 선택합니다.
+        //        currentMapType은 FDAppManager.mapTypeFlow를 구독하므로 설정 변경 시 자동 재렌더링됩니다.
+        //        iOS의 HistoryMapView / HistoryKakaoMapView 분기에 대응합니다.
+        when (currentMapType) {
+            MapType.GOOGLE_MAP -> GoogleHistoryMapView(
+                polylines     = uiState.polylines,
+                stateMarkers  = uiState.stateMarkers,
+                photoMarkers  = uiState.photoMarkers,
+                onMarkerClick = { markerId -> viewModel.selectMarker(markerId) },
+                modifier      = Modifier.fillMaxSize()
+            )
+            MapType.KAKAO_MAP -> KakaoHistoryMapView(
+                polylines     = uiState.polylines,
+                stateMarkers  = uiState.stateMarkers,
+                photoMarkers  = uiState.photoMarkers,
+                onMarkerClick = { markerId -> viewModel.selectMarker(markerId) },
+                modifier      = Modifier.fillMaxSize()
+            )
+        }
 
         // ── 2. 상단 정보 카드 ────────────────────────────────────────────────────
         HistoryInfoCard(

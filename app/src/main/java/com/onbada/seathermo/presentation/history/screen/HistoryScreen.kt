@@ -46,6 +46,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -87,6 +89,20 @@ fun HistoryTabNavHost(
 ) {
     val navController = rememberNavController()
 
+    // 히스토리 탭이 비활성화될 때 상세 화면을 강제로 닫습니다.
+    // [개념] Kakao SDK는 전역 GL 엔진을 공유하므로 KakaoHistoryMapView가 Composition에 남아있으면
+    //        낚시기록 지도와 레이어/카메라가 충돌합니다.
+    //        탭 전환 시 popBackStack()으로 KakaoHistoryMapView를 즉시 제거하여 GL 리소스를 해제합니다.
+    //        iOS의 viewWillDisappear에서 stopRendering()을 호출하는 패턴과 동일한 의도입니다.
+    LaunchedEffect(isVisible) {
+        if (!isVisible) {
+            val currentRoute = navController.currentBackStackEntry?.destination?.route
+            if (currentRoute?.startsWith("history_detail") == true) {
+                navController.popBackStack()
+            }
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = "history_list",
@@ -109,7 +125,17 @@ fun HistoryTabNavHost(
         // 히스토리 상세 화면
         // HistoryImageViewer는 HistoryDetailScreen 내부에서 Dialog로 처리되므로
         // 별도 Navigation Route가 필요 없습니다.
-        composable("history_detail/{sessionId}") { backStackEntry ->
+        //
+        composable(
+            route = "history_detail/{sessionId}",
+            enterTransition = { EnterTransition.None },
+            // [개념] popExitTransition을 None으로 설정합니다.
+            //        탭 전환 시 LaunchedEffect(isVisible)에서 popBackStack()이 호출되면
+            //        slideOutHorizontally가 실행되어 스와이프 닫힘 모션이 생깁니다.
+            //        AndroidView(KakaoMapView)는 Compose 애니메이션에 참여하지 않으므로
+            //        애니메이션 없이 즉시 닫는 것이 더 자연스럽습니다.
+            popExitTransition = { ExitTransition.None }
+        ) { backStackEntry ->
             val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
             HistoryDetailScreen(
                 sessionId       = sessionId,

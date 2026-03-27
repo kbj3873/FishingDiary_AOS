@@ -20,9 +20,11 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -82,6 +84,22 @@ fun SettingScreen(
     //        화면이 백그라운드로 가면 수집을 자동 중단하여 불필요한 연산을 막습니다.
     //        Swift의 @StateObject + @Published 조합과 동일한 역할입니다.
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // 낚시 기록 중 지도 변경 차단 팝업
+    // [개념] if (condition) { AlertDialog { } }는 조건부 Composable 렌더링입니다.
+    //        uiState.showRecordingBlockedDialog가 true일 때만 Dialog가 Composition에 포함됩니다.
+    if (uiState.showRecordingBlockedDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissRecordingBlockedDialog() },
+            title = { Text(text = "지도 변경 불가") },
+            text = { Text(text = "낚시 기록 중에는 지도 타입을 변경할 수 없습니다.\n기록을 종료한 후 변경해 주세요.") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.dismissRecordingBlockedDialog() }) {
+                    Text(text = "확인")
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier

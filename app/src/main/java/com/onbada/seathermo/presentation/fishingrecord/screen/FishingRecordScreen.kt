@@ -56,9 +56,24 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.PolylineOptions
+import com.kakao.vectormap.KakaoMap
+import com.kakao.vectormap.LatLng as KakaoLatLng
+import com.kakao.vectormap.camera.CameraUpdateFactory as KakaoCameraUpdateFactory
+import com.kakao.vectormap.label.Label
+import com.kakao.vectormap.label.LabelLayer
+import com.kakao.vectormap.label.LabelLayerOptions
+import com.kakao.vectormap.label.LabelOptions
+import com.kakao.vectormap.label.LabelStyle
+import com.kakao.vectormap.shape.MapPoints
+import com.kakao.vectormap.shape.PolylineOptions as KakaoPolylineOptions
+import com.kakao.vectormap.shape.PolylineStyle
+import com.kakao.vectormap.shape.ShapeLayer
+import com.kakao.vectormap.shape.ShapeLayerOptions
 import com.onbada.seathermo.R
+import com.onbada.seathermo.domain.entity.MapType
 import com.onbada.seathermo.managers.FDAppManager
 import com.onbada.seathermo.presentation.fishingrecord.screen.components.GoogleRecordMapView
+import com.onbada.seathermo.presentation.fishingrecord.screen.components.KakaoRecordMapView
 import com.onbada.seathermo.presentation.fishingrecord.viewmodel.FishingRecordUiState
 import com.onbada.seathermo.presentation.fishingrecord.viewmodel.FishingRecordViewModel
 import com.onbada.seathermo.presentation.fishingrecord.viewmodel.SpeedUnit
@@ -87,16 +102,38 @@ private val StateIdleTextColor = Color(0xFF64748B)
  *        Box는 iOS의 ZStack과 동일한 역할을 합니다.
  */
 @Composable
-fun FishingRecordScreen(viewModel: FishingRecordViewModel) {
+fun FishingRecordScreen(
+    viewModel: FishingRecordViewModel,
+    isVisible: Boolean = true
+) {
     // [개념] collectAsStateWithLifecycle()은 앱이 백그라운드 상태일 때 Flow 수집을 자동 중단합니다.
     //        Swift의 @ObservedObject와 동일하게 UI가 자동으로 상태를 반영합니다.
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
+    // 현재 지도 타입을 실시간으로 구독합니다.
+    // [개념] FDAppManager.mapTypeFlow는 StateFlow이므로 collectAsStateWithLifecycle()로
+    //        변경 시 Recomposition이 발생합니다. 설정 탭에서 지도 타입을 변경하면
+    //        이 화면도 자동으로 다시 그려집니다.
+    val currentMapType by FDAppManager.getInstance().mapTypeFlow.collectAsStateWithLifecycle()
+
     // GoogleMap 인스턴스 보관 (지도 컨트롤 버튼에서 사용)
     // [개념] var googleMap by remember { mutableStateOf<GoogleMap?>(null) }은
     //        지도가 준비되면 참조를 저장합니다. null인 동안 컨트롤 버튼 클릭은 무시됩니다.
     var googleMap by remember { mutableStateOf<GoogleMap?>(null) }
+
+    // KakaoMap 인스턴스 보관 (KAKAO_MAP 타입 선택 시 사용)
+    var kakaoMap by remember { mutableStateOf<KakaoMap?>(null) }
+    // Kakao 레이어 참조 — onMapReady에서 초기화 후 LaunchedEffect에서 사용합니다.
+    var kakaoPolyLayer by remember { mutableStateOf<ShapeLayer?>(null) }
+    var kakaoStateLabelLayer by remember { mutableStateOf<LabelLayer?>(null) }
+    var kakaoPhotoLabelLayer by remember { mutableStateOf<LabelLayer?>(null) }
+    // 현재 위치 마커 레이어 — Kakao Maps는 isMyLocationEnabled 없으므로 직접 관리합니다.
+    var kakaoLocationLabelLayer by remember { mutableStateOf<LabelLayer?>(null) }
+    // 현재 위치 마커 Label 참조 — 초기 표시(LaunchedEffect)와 GPS 이동(mapLineEvents) 양쪽에서 공유합니다.
+    // [개념] 로컬 변수로 관리하면 두 LaunchedEffect가 각자 별도 Label을 추가하여 마커가 2개 생깁니다.
+    //        Screen 레벨 state로 공유하면 동일한 Label을 추적하여 moveTo()가 올바르게 동작합니다.
+    var kakaoLocationLabel by remember { mutableStateOf<Label?>(null) }
 
     // 권한 허용 시 기록을 즉시 시작할지 여부.
     // [개념] 탭 진입 시 권한 요청(false)과 기록 버튼 탭 시 권한 요청(true)을 구분합니다.
@@ -339,13 +376,194 @@ fun FishingRecordScreen(viewModel: FishingRecordViewModel) {
 
     // 녹화 중단 감지: isRecording이 true → false로 바뀔 때 지도를 초기화합니다.
     // [개념] iOS의 kakaoMapAction = .clearMap / mapCoordinator?.clearMap() 호출에 대응합니다.
+    //        Google/Kakao 초기화를 하나의 블록에서 처리하여 wasRecording 상태 경쟁을 방지합니다.
     LaunchedEffect(uiState.isRecording) {
         if (wasRecording && !uiState.isRecording) {
+            // Google 지도 초기화
             googleMap?.clear()
+            // Kakao 레이어 초기화 후 재생성
+            // [개념] ShapeLayer/LabelLayer에는 인자 없는 remove()가 없으므로 매니저를 통해 제거합니다.
+            // 경로/마커 레이어만 초기화합니다. 위치 레이어는 기록 상태와 무관하게 유지합니다.
+            // [개념] 위치 레이어를 재생성하면 기존 마커가 사라집니다.
+            //        기록 중단 후에도 현재 위치를 계속 표시해야 하므로
+            //        위치 레이어(kakaoLocationLabelLayer, kakaoLocationLabel)는 건드리지 않습니다.
+            kakaoMap?.let { m ->
+                kakaoPolyLayer?.let { m.getShapeManager()?.remove(it) }
+                kakaoStateLabelLayer?.let { m.getLabelManager()?.remove(it) }
+                kakaoPhotoLabelLayer?.let { m.getLabelManager()?.remove(it) }
+            }
+            kakaoPolyLayer = null
+            kakaoStateLabelLayer = null
+            kakaoPhotoLabelLayer = null
+            kakaoMap?.let { map ->
+                kakaoPolyLayer = map.getShapeManager()?.addLayer(
+                    ShapeLayerOptions.from("record_poly_layer").setZOrder(9999)
+                )
+                val labelMgr = map.getLabelManager()
+                kakaoStateLabelLayer = labelMgr?.addLayer(
+                    LabelLayerOptions.from("record_state_layer").setZOrder(1)
+                )
+                kakaoPhotoLabelLayer = labelMgr?.addLayer(
+                    LabelLayerOptions.from("record_photo_layer").setZOrder(2)
+                )
+            }
             lastDrawnMarkerCount = 0
             lastDrawnPhotoMarkerCount = 0
         }
         wasRecording = uiState.isRecording
+    }
+
+    // 지도 타입 변경 시 두 맵 인스턴스와 드로잉 카운터를 초기화합니다.
+    // [개념] currentMapType이 변경되면 기존 map 참조가 더 이상 유효하지 않으므로 null로 초기화합니다.
+    //        낚시 기록 중에는 SettingViewModel에서 변경이 차단되므로 기록 데이터 손실이 없습니다.
+    LaunchedEffect(currentMapType) {
+        googleMap = null
+        kakaoMap = null
+        kakaoPolyLayer = null
+        kakaoStateLabelLayer = null
+        kakaoPhotoLabelLayer = null
+        kakaoLocationLabelLayer = null
+        kakaoLocationLabel = null
+        lastDrawnMarkerCount = 0
+        lastDrawnPhotoMarkerCount = 0
+    }
+
+    // ── Kakao 초기 카메라 이동 ─────────────────────────────────────────────
+    // Google의 LaunchedEffect(googleMap, locationPermissionGranted)에 대응합니다.
+    LaunchedEffect(kakaoMap, locationPermissionGranted) {
+        val map = kakaoMap ?: return@LaunchedEffect
+        if (!locationPermissionGranted) return@LaunchedEffect
+
+        try {
+            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                if (location != null) {
+                    map.moveCamera(
+                        KakaoCameraUpdateFactory.newCenterPosition(
+                            KakaoLatLng.from(location.latitude, location.longitude), 15
+                        )
+                    )
+                    // 현재 위치 마커 표시 (Google Maps의 파란 점 역할)
+                    // [개념] Kakao Maps는 isMyLocationEnabled가 없으므로 직접 LabelLayer로 구현합니다.
+                    //        반환된 Label을 공유 변수에 저장하여 mapLineEvents에서 moveTo()로 재사용합니다.
+                    kakaoLocationLabel = showKakaoLocationMarker(
+                        context, kakaoLocationLabelLayer,
+                        location.latitude, location.longitude
+                    )
+                } else {
+                    fusedLocationClient.getCurrentLocation(
+                        Priority.PRIORITY_HIGH_ACCURACY, null
+                    ).addOnSuccessListener { current ->
+                        current?.let {
+                            map.moveCamera(
+                                KakaoCameraUpdateFactory.newCenterPosition(
+                                    KakaoLatLng.from(it.latitude, it.longitude), 15
+                                )
+                            )
+                            kakaoLocationLabel = showKakaoLocationMarker(
+                                context, kakaoLocationLabelLayer,
+                                it.latitude, it.longitude
+                            )
+                        }
+                    }
+                }
+            }
+        } catch (e: SecurityException) { /* 권한 없음 */ }
+    }
+
+    // ── Kakao 경로선 그리기 ────────────────────────────────────────────────
+    // Google의 LaunchedEffect(viewModel) { mapLineEvents.collect { } }에 대응합니다.
+    LaunchedEffect(viewModel) {
+        // [개념] Label.moveTo()로 위치 마커를 이동합니다. 레이어를 재생성하지 않아 성능이 좋습니다.
+        //        kakaoLocationLabel은 Screen 레벨 공유 변수입니다.
+        //        LaunchedEffect(kakaoMap, locationPermissionGranted)에서 초기 마커를 추가하고
+        //        이 coroutine에서 moveTo()로 갱신하여 마커가 중복 생성되지 않습니다.
+        viewModel.mapLineEvents.collect { (mapLine, fishingState) ->
+            val layer = kakaoPolyLayer ?: return@collect
+            if (!viewModel.uiState.value.isRecording) return@collect
+
+            val prevLat = mapLine.previousLocation.latitude
+            val prevLon = mapLine.previousLocation.longitude
+            val currLat = mapLine.currentLocation.latitude
+            val currLon = mapLine.currentLocation.longitude
+
+            if (prevLat != 0.0 && prevLon != 0.0 && currLat != 0.0 && currLon != 0.0) {
+                val color = stateLineColor(fishingState).toArgb()
+                // [개념] Kakao Maps는 MapPoints + PolylineStyle로 폴리라인을 정의합니다.
+                //        MapPoints.fromLatLng()에 좌표 컬렉션을 전달합니다.
+                val mapPoints = MapPoints.fromLatLng(listOf(
+                    KakaoLatLng.from(prevLat, prevLon),
+                    KakaoLatLng.from(currLat, currLon)
+                ))
+                layer.addPolyline(KakaoPolylineOptions.from(mapPoints, PolylineStyle.from(8f, color)))
+            }
+
+            // 현재 위치 마커 갱신 — 기록 중 GPS 업데이트마다 위치 마커를 이동합니다.
+            // [개념] Label.moveTo(LatLng)는 레이어를 재생성하지 않고 기존 마커 좌표만 변경합니다.
+            if (currLat != 0.0 && currLon != 0.0) {
+                val existingLabel = kakaoLocationLabel
+                if (existingLabel != null) {
+                    existingLabel.moveTo(KakaoLatLng.from(currLat, currLon))
+                } else {
+                    kakaoLocationLabel = showKakaoLocationMarker(
+                        context, kakaoLocationLabelLayer, currLat, currLon
+                    )
+                }
+            }
+        }
+    }
+
+    // ── Kakao 상태 변경 마커 추가 ──────────────────────────────────────────
+    // Google의 LaunchedEffect(uiState.markers.size)에 대응합니다.
+    LaunchedEffect(uiState.markers.size) {
+        val stateLabelLayer = kakaoStateLabelLayer ?: return@LaunchedEffect
+        if (uiState.markers.size <= lastDrawnMarkerCount) return@LaunchedEffect
+
+        val density = context.resources.displayMetrics.density
+        val newMarkers = uiState.markers.drop(lastDrawnMarkerCount)
+        newMarkers.forEach { stateMarker ->
+            val iconResId = when (stateMarker.state) {
+                FDAppManager.FishingState.MOVING -> R.drawable.ic_map_marker_blue
+                FDAppManager.FishingState.DRIFTING -> R.drawable.ic_map_marker_orange
+                FDAppManager.FishingState.FISHING -> R.drawable.ic_map_marker_red
+            }
+            val bitmap = BitmapFactory.decodeResource(context.resources, iconResId)
+            // Kakao SDK는 비트맵 픽셀을 dp처럼 처리하므로 density로 나눠 Google Maps와 동일한 시각적 크기로 맞춥니다.
+            // KakaoHistoryMapView의 상태 마커 스케일링과 동일한 로직입니다.
+            val scaledBitmap = android.graphics.Bitmap.createScaledBitmap(
+                bitmap,
+                (bitmap.width / density * 2).toInt(),
+                (bitmap.height / density * 2).toInt(),
+                true
+            )
+            // [개념] Kakao Maps 마커는 LabelOptions에 LabelStyle을 설정하여 추가합니다.
+            //        LabelStyle.from(Bitmap)으로 비트맵 기반 스타일을 직접 생성할 수 있습니다.
+            val labelOptions = LabelOptions.from(
+                KakaoLatLng.from(stateMarker.latitude, stateMarker.longitude)
+            ).setStyles(LabelStyle.from(scaledBitmap))
+            stateLabelLayer.addLabel(labelOptions)
+        }
+        lastDrawnMarkerCount = uiState.markers.size
+    }
+
+    // ── Kakao 사진 마커 추가 ───────────────────────────────────────────────
+    // Google의 LaunchedEffect(uiState.photoMarkers.size)에 대응합니다.
+    LaunchedEffect(uiState.photoMarkers.size) {
+        val photoLabelLayer = kakaoPhotoLabelLayer ?: return@LaunchedEffect
+        if (uiState.photoMarkers.size <= lastDrawnPhotoMarkerCount) return@LaunchedEffect
+
+        val newPhotoMarkers = uiState.photoMarkers.drop(lastDrawnPhotoMarkerCount)
+        newPhotoMarkers.forEach { photoMarker ->
+            // Kakao SDK는 비트맵 픽셀을 dp처럼 처리하므로 density를 곱하지 않은 전용 함수를 사용합니다.
+            // (Google Maps용 loadPhotoMarkerBitmap은 density를 곱한 px 값을 사용하여 Kakao에서 너무 크게 표시됨)
+            val thumbnailBitmap = loadKakaoPhotoMarkerBitmap(context, photoMarker.thumbnailPath)
+                ?: return@forEach
+            val labelOptions = LabelOptions.from(
+                KakaoLatLng.from(photoMarker.latitude, photoMarker.longitude)
+            ).setStyles(LabelStyle.from(thumbnailBitmap))
+            photoLabelLayer.addLabel(labelOptions)
+        }
+        lastDrawnPhotoMarkerCount = uiState.photoMarkers.size
     }
 
     // onDisappear: 위치 모니터링 중단.
@@ -360,23 +578,54 @@ fun FishingRecordScreen(viewModel: FishingRecordViewModel) {
     Box(modifier = Modifier.fillMaxSize()) {
 
         // ── 1. 지도 레이어 ────────────────────────────────────────────────────
-        GoogleRecordMapView(
-            modifier = Modifier.fillMaxSize(),
-            onMapReady = { map ->
-                // [개념] GoogleRecordMapView의 update 블록이 리컴포지션마다 getMapAsync를 재호출하므로
-                //        onMapReady도 반복 실행됩니다. 이미 동일 인스턴스가 설정된 경우엔
-                //        초기화 코드를 건너뛰어 불필요한 재설정을 방지합니다.
-                if (googleMap == map) return@GoogleRecordMapView
+        // [개념] when(currentMapType)으로 Google/Kakao 지도를 선택합니다.
+        //        currentMapType은 FDAppManager.mapTypeFlow를 구독하므로 설정 변경 시 자동 전환됩니다.
+        //        낚시 기록 중에는 SettingViewModel에서 변경이 차단됩니다.
+        when (currentMapType) {MapType.GOOGLE_MAP -> GoogleRecordMapView(
+                modifier = Modifier.fillMaxSize(),
+                onMapReady = { map ->
+                    // [개념] GoogleRecordMapView의 update 블록이 리컴포지션마다 getMapAsync를 재호출하므로
+                    //        onMapReady도 반복 실행됩니다. 이미 동일 인스턴스가 설정된 경우엔
+                    //        초기화 코드를 건너뛰어 불필요한 재설정을 방지합니다.
+                    if (googleMap == map) return@GoogleRecordMapView
 
-                googleMap = map
-                // 커스텀 UI를 사용하므로 기본 컨트롤 비활성화
-                map.uiSettings.isZoomControlsEnabled = false
-                map.uiSettings.isMyLocationButtonEnabled = false
-                map.uiSettings.isCompassEnabled = false
-                // isMyLocationEnabled는 LaunchedEffect(googleMap, locationPermissionGranted)에서 설정합니다.
-                // 권한 없이 탭에 진입한 경우에도 권한 허용 직후 재실행되어 정상 처리됩니다.
-            }
-        )
+                    googleMap = map
+                    // 커스텀 UI를 사용하므로 기본 컨트롤 비활성화
+                    map.uiSettings.isZoomControlsEnabled = false
+                    map.uiSettings.isMyLocationButtonEnabled = false
+                    map.uiSettings.isCompassEnabled = false
+                    // isMyLocationEnabled는 LaunchedEffect(googleMap, locationPermissionGranted)에서 설정합니다.
+                }
+            )
+            MapType.KAKAO_MAP -> KakaoRecordMapView(
+                modifier = Modifier.fillMaxSize(),
+                isVisible = isVisible,
+                onMapReady = { map ->
+                    if (kakaoMap == map) return@KakaoRecordMapView
+
+                    kakaoMap = map
+                    // [개념] Kakao Maps는 레이어 기반 구조입니다.
+                    //        폴리라인 레이어(zOrder 9999), 상태 마커 레이어(1), 사진 마커 레이어(2) 순으로 생성합니다.
+                    //        iOS의 RecordKakaoMapViewController 레이어 구조와 동일합니다.
+                    kakaoPolyLayer = map.getShapeManager()?.addLayer(
+                        ShapeLayerOptions.from("record_poly_layer").setZOrder(9999)
+                    )
+                    val labelMgr = map.getLabelManager()
+                    kakaoStateLabelLayer = labelMgr?.addLayer(
+                        LabelLayerOptions.from("record_state_layer").setZOrder(1)
+                    )
+                    kakaoPhotoLabelLayer = labelMgr?.addLayer(
+                        LabelLayerOptions.from("record_photo_layer").setZOrder(2)
+                    )
+                    // 현재 위치 마커 레이어 — 모든 레이어 위에 표시합니다.
+                    kakaoLocationLabelLayer = labelMgr?.addLayer(
+                        LabelLayerOptions.from("record_location_layer").setZOrder(99999)
+                    )
+                    // 맵이 교체되면 이전 Label 참조가 유효하지 않으므로 초기화합니다.
+                    kakaoLocationLabel = null
+                }
+            )
+        }
 
         // ── 2. 오버레이 레이어 ────────────────────────────────────────────────
         Box(modifier = Modifier.fillMaxSize()) {
@@ -394,30 +643,77 @@ fun FishingRecordScreen(viewModel: FishingRecordViewModel) {
             // 우측: MapControlButtons
             // top: TopInfoBar top(16dp) + InfoBar height(~52dp) + gap(12dp) = 80dp
             MapControlButtons(
-                onZoomIn = { googleMap?.animateCamera(CameraUpdateFactory.zoomIn()) },
-                onZoomOut = { googleMap?.animateCamera(CameraUpdateFactory.zoomOut()) },
+                onZoomIn = {
+                    when (currentMapType) {
+                        MapType.GOOGLE_MAP -> googleMap?.animateCamera(CameraUpdateFactory.zoomIn())
+                        MapType.KAKAO_MAP -> kakaoMap?.moveCamera(KakaoCameraUpdateFactory.zoomIn())
+                    }
+                },
+                onZoomOut = {
+                    when (currentMapType) {
+                        MapType.GOOGLE_MAP -> googleMap?.animateCamera(CameraUpdateFactory.zoomOut())
+                        MapType.KAKAO_MAP -> kakaoMap?.moveCamera(KakaoCameraUpdateFactory.zoomOut())
+                    }
+                },
                 onMyLocation = {
-                    val map = googleMap ?: return@MapControlButtons
                     if (!LocationPermissionHelper.hasLocationPermission(context)) return@MapControlButtons
                     try {
                         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
                         fusedLocationClient.lastLocation.addOnSuccessListener { location ->
                             if (location != null) {
-                                map.animateCamera(
-                                    CameraUpdateFactory.newLatLngZoom(
-                                        LatLng(location.latitude, location.longitude), 15f
+                                when (currentMapType) {
+                                    MapType.GOOGLE_MAP -> googleMap?.animateCamera(
+                                        CameraUpdateFactory.newLatLngZoom(
+                                            LatLng(location.latitude, location.longitude), 15f
+                                        )
                                     )
-                                )
+                                    MapType.KAKAO_MAP -> {
+                                        kakaoMap?.moveCamera(
+                                            KakaoCameraUpdateFactory.newCenterPosition(
+                                                KakaoLatLng.from(location.latitude, location.longitude), 15
+                                            )
+                                        )
+                                        // 카메라 이동 외에 현재 위치 마커도 갱신합니다.
+                                        // 기록 중단 후 마커가 없는 경우 새로 추가하고, 이미 있으면 위치만 이동합니다.
+                                        val existingLabel = kakaoLocationLabel
+                                        if (existingLabel != null) {
+                                            existingLabel.moveTo(KakaoLatLng.from(location.latitude, location.longitude))
+                                        } else {
+                                            kakaoLocationLabel = showKakaoLocationMarker(
+                                                context, kakaoLocationLabelLayer,
+                                                location.latitude, location.longitude
+                                            )
+                                        }
+                                    }
+                                }
                             } else {
                                 fusedLocationClient.getCurrentLocation(
                                     Priority.PRIORITY_HIGH_ACCURACY, null
                                 ).addOnSuccessListener { current ->
                                     current?.let {
-                                        map.animateCamera(
-                                            CameraUpdateFactory.newLatLngZoom(
-                                                LatLng(it.latitude, it.longitude), 15f
+                                        when (currentMapType) {
+                                            MapType.GOOGLE_MAP -> googleMap?.animateCamera(
+                                                CameraUpdateFactory.newLatLngZoom(
+                                                    LatLng(it.latitude, it.longitude), 15f
+                                                )
                                             )
-                                        )
+                                            MapType.KAKAO_MAP -> {
+                                                kakaoMap?.moveCamera(
+                                                    KakaoCameraUpdateFactory.newCenterPosition(
+                                                        KakaoLatLng.from(it.latitude, it.longitude), 15
+                                                    )
+                                                )
+                                                val existingLabel = kakaoLocationLabel
+                                                if (existingLabel != null) {
+                                                    existingLabel.moveTo(KakaoLatLng.from(it.latitude, it.longitude))
+                                                } else {
+                                                    kakaoLocationLabel = showKakaoLocationMarker(
+                                                        context, kakaoLocationLabelLayer,
+                                                        it.latitude, it.longitude
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -1084,6 +1380,106 @@ private fun loadPhotoMarkerBitmap(context: Context, thumbnailPath: String): Bitm
     val drawnHeight = srcHeight * scale
     val drawnX = imageRect.left + (dstSize - drawnWidth) / 2f
     val drawnY = imageRect.top + (dstSize - drawnHeight) / 2f
+
+    paint.reset()
+    canvas.drawBitmap(
+        originalBitmap,
+        null,
+        RectF(drawnX, drawnY, drawnX + drawnWidth, drawnY + drawnHeight),
+        paint
+    )
+    canvas.restore()
+
+    return result
+}
+
+/**
+ * Kakao 지도에 현재 위치 마커를 추가합니다.
+ *
+ * [개념] Google Maps의 isMyLocationEnabled = true가 표시하는 파란 점에 대응합니다.
+ *        Kakao Maps SDK에는 내장 현재 위치 표시 기능이 없으므로 LabelLayer를 직접 관리합니다.
+ *        초기 위치 표시(최초 진입)와 기록 중 위치 업데이트(moveTo) 두 곳에서 사용합니다.
+ *
+ * @param context          앱 Context (리소스 로드용)
+ * @param locationLayer    위치 마커를 추가할 LabelLayer (null이면 no-op)
+ * @param latitude         현재 위도
+ * @param longitude        현재 경도
+ * @return 추가된 Label 인스턴스 (moveTo 갱신에 재사용), 레이어 없으면 null
+ */
+private fun showKakaoLocationMarker(
+    context: Context,
+    locationLayer: LabelLayer?,
+    latitude: Double,
+    longitude: Double
+): Label? {
+    val layer = locationLayer ?: return null
+    val bitmap = BitmapFactory.decodeResource(context.resources, R.drawable.map_ico_marker)
+    // [개념] setAnchorPoint(0.5f, 0.5f)는 이미지의 정중앙을 GPS 좌표에 맞춥니다.
+    //        기본값은 하단 중앙(0.5f, 1.0f)으로, 원형 아이콘이 실제 좌표보다 위로 올라가 보이는 원인입니다.
+    //        경로라인 위에 아이콘 중앙이 정확히 위치하도록 중앙 앵커로 수정합니다.
+    return layer.addLabel(
+        LabelOptions.from(KakaoLatLng.from(latitude, longitude))
+            .setStyles(LabelStyle.from(bitmap).setAnchorPoint(0.5f, 0.5f))
+    )
+}
+
+/**
+ * Kakao Maps용 사진 마커 Bitmap 생성.
+ *
+ * KakaoHistoryMapView의 loadHistoryPhotoMarkerBitmap과 동일한 로직입니다.
+ * Google Maps용 loadPhotoMarkerBitmap과 달리 density를 곱하지 않습니다.
+ * Kakao SDK는 비트맵 픽셀을 dp처럼 해석하므로, density를 곱하면 3배 이상 크게 표시됩니다.
+ *
+ * @param context 앱 Context
+ * @param thumbnailPath Documents 디렉토리 기준 상대 경로
+ * @return 마커용 Bitmap (파일 없으면 null)
+ */
+private fun loadKakaoPhotoMarkerBitmap(context: Context, thumbnailPath: String): Bitmap? {
+    val thumbPath = thumbnailPath.removeSuffix(".jpg") + "_thumb.jpg"
+    val file = File(context.filesDir, thumbPath).takeIf { it.exists() }
+        ?: File(context.filesDir, thumbnailPath).takeIf { it.exists() }
+        ?: return null
+
+    val originalBitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return null
+
+    // Kakao SDK는 비트맵 픽셀을 dp처럼 처리하므로, density를 곱하지 않고 dp 값 그대로 사용합니다.
+    val imageSize    = 96
+    val borderWidth  = 6
+    val cornerRadius = 20f
+    val totalSize    = imageSize + borderWidth * 2
+
+    val result = Bitmap.createBitmap(totalSize, totalSize, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(result)
+    val paint  = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    // 1. 초록 테두리 배경 (Figma: #10B981)
+    paint.color = android.graphics.Color.parseColor("#10B981")
+    canvas.drawRoundRect(
+        RectF(0f, 0f, totalSize.toFloat(), totalSize.toFloat()),
+        cornerRadius + borderWidth,
+        cornerRadius + borderWidth,
+        paint
+    )
+
+    // 2. 이미지 영역 클리핑 후 Aspect Fill 방식으로 그리기
+    val imageRect = RectF(
+        borderWidth.toFloat(), borderWidth.toFloat(),
+        (borderWidth + imageSize).toFloat(), (borderWidth + imageSize).toFloat()
+    )
+    canvas.save()
+    val clipPath = android.graphics.Path().apply {
+        addRoundRect(imageRect, cornerRadius, cornerRadius, android.graphics.Path.Direction.CW)
+    }
+    canvas.clipPath(clipPath)
+
+    val srcWidth  = originalBitmap.width.toFloat()
+    val srcHeight = originalBitmap.height.toFloat()
+    val dstSize   = imageSize.toFloat()
+    val scale     = maxOf(dstSize / srcWidth, dstSize / srcHeight)
+    val drawnWidth  = srcWidth * scale
+    val drawnHeight = srcHeight * scale
+    val drawnX = imageRect.left + (dstSize - drawnWidth) / 2f
+    val drawnY = imageRect.top  + (dstSize - drawnHeight) / 2f
 
     paint.reset()
     canvas.drawBitmap(

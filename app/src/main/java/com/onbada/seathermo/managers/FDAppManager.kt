@@ -3,6 +3,9 @@ package com.onbada.seathermo.managers
 import android.content.Context
 import android.content.SharedPreferences
 import com.onbada.seathermo.domain.entity.MapType
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * 앱 관리자 클래스
@@ -81,10 +84,21 @@ class FDAppManager private constructor() {
     /**
      * 현재 지도 타입.
      *
-     * 기본값: GOOGLE_MAP
-     * iOS의 var mapTp: MapType = .AppleMap에 대응합니다.
+     * 기본값: KAKAO_MAP
+     * iOS의 var mapTp: MapType = .KakaoMap에 대응합니다.
      */
-    var mapType: MapType = MapType.GOOGLE_MAP
+    var mapType: MapType = MapType.KAKAO_MAP
+        private set
+
+    // 지도 타입 변경을 실시간으로 구독할 수 있는 StateFlow.
+    // [개념] StateFlow는 항상 최신 값을 보유하는 스트림으로, collect하는 Composable이
+    //        자동으로 Recomposition됩니다. HistoryDetailScreen에서 설정 변경을 감지하는 데 사용합니다.
+    private val _mapTypeFlow = MutableStateFlow(MapType.KAKAO_MAP)
+    val mapTypeFlow: StateFlow<MapType> = _mapTypeFlow.asStateFlow()
+
+    // 낚시 기록 진행 여부.
+    // [개념] SettingViewModel에서 기록 중 지도 타입 변경을 차단하기 위해 확인합니다.
+    var isRecording: Boolean = false
         private set
 
     /**
@@ -113,7 +127,8 @@ class FDAppManager private constructor() {
 
         // SharedPreferences에서 저장된 지도 타입 로드
         // iOS: let savedMapType = FDUserDefaults.integer(forKey: UserDefaultKey.mapType)
-        val savedRawValue = prefs?.getInt(KEY_MAP_TYPE, 0) ?: 0
+        // 기본값 1 = KAKAO_MAP (신규 설치 시 카카오맵이 기본값)
+        val savedRawValue = prefs?.getInt(KEY_MAP_TYPE, 1) ?: 1
         setMapType(savedRawValue)
     }
 
@@ -128,12 +143,27 @@ class FDAppManager private constructor() {
         mapType = when (rawValue) {
             0 -> MapType.GOOGLE_MAP
             1 -> MapType.KAKAO_MAP
-            else -> MapType.GOOGLE_MAP
+            else -> MapType.KAKAO_MAP
         }
+
+        // mapTypeFlow도 함께 업데이트하여 구독 중인 Composable에 변경을 전파합니다.
+        _mapTypeFlow.value = mapType
 
         // [개념] SharedPreferences.edit().putInt().apply()는 비동기로 디스크에 저장합니다.
         //        apply()는 commit()과 달리 메인 스레드를 블로킹하지 않습니다.
         //        iOS의 UserDefaults.standard.set(_:forKey:)에 대응합니다.
         prefs?.edit()?.putInt(KEY_MAP_TYPE, rawValue)?.apply()
+    }
+
+    /**
+     * 낚시 기록 진행 여부를 설정합니다.
+     *
+     * FishingRecordViewModel에서 기록 시작/종료 시 호출합니다.
+     * SettingViewModel이 기록 중 지도 타입 변경을 차단하는 데 사용합니다.
+     *
+     * @param recording true = 기록 중, false = 기록 종료
+     */
+    fun setRecording(recording: Boolean) {
+        isRecording = recording
     }
 }

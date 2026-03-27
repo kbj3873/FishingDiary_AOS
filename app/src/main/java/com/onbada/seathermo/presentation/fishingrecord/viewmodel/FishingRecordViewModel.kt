@@ -213,6 +213,10 @@ class FishingRecordViewModel(
             savedPointCount = 1 // 시작 지점 포함
         )}
 
+        // 전역 AppManager에 기록 시작 상태를 알립니다.
+        // SettingViewModel이 기록 중 지도 타입 변경을 차단하는 데 사용합니다.
+        FDAppManager.getInstance().setRecording(true)
+
         locationManager.startTracking()
         startTimer()
 
@@ -242,7 +246,10 @@ class FishingRecordViewModel(
             isRecording = false,
             isStopPopupPresented = false
         )}
-        
+
+        // 기록 종료 시 AppManager 상태도 해제합니다.
+        FDAppManager.getInstance().setRecording(false)
+
         locationManager.stopTracking()
         stopTimer()
     }

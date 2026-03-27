@@ -206,7 +206,10 @@ fun MainTabScreen(
                             val fishingRecordViewModel: FishingRecordViewModel = viewModel(
                                 factory = diContainer.makeFishingRecordViewModelFactory()
                             )
-                            FishingRecordScreen(viewModel = fishingRecordViewModel)
+                            FishingRecordScreen(
+                                viewModel = fishingRecordViewModel,
+                                isVisible = isVisible
+                            )
                         }
                         TabItem.History -> HistoryTabNavHost(
                             diContainer = diContainer,

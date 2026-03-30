@@ -5,6 +5,8 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
 }
 
 android {
@@ -49,6 +51,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // 릴리즈 빌드 시 ProGuard/R8 난독화 매핑 파일을 Crashlytics에 자동 업로드합니다.
+            // isMinifyEnabled = true로 변경 시 크래시 스택 트레이스가 올바르게 복원됩니다.
+            firebaseCrashlytics {
+                mappingFileUploadEnabled = true
+            }
         }
     }
     compileOptions {
@@ -116,6 +123,14 @@ dependencies {
     implementation("com.kakao.maps.open:android:2.13.0")
     // Google Maps SDK
     implementation("com.google.android.gms:play-services-maps:18.2.0")
+
+    // Firebase BOM (버전 통합 관리)
+    // [개념] BOM(Bill of Materials)을 사용하면 Firebase 라이브러리 버전을 개별 지정 없이
+    //        BOM 버전 하나로 일괄 관리할 수 있습니다.
+    val firebaseBom = platform("com.google.firebase:firebase-bom:33.11.0")
+    implementation(firebaseBom)
+    implementation("com.google.firebase:firebase-analytics")      // 사용자 행동 분석
+    implementation("com.google.firebase:firebase-crashlytics")    // 크래시 리포트
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

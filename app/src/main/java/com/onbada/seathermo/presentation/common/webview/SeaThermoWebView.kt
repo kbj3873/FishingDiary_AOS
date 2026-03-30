@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -18,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import com.onbada.seathermo.BuildConfig
+
+private const val TAG = "SeaThermoWebView"
 
 /**
  * 온바다 서버 웹 콘텐츠 표시를 위한 공통 WebView Composable.
@@ -42,6 +45,7 @@ fun SeaThermoWebView(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
+    Log.d(TAG, "SeaThermoWebView Loading: $url")
 
     // [개념] remember { }는 Recomposition이 일어나도 WebView 인스턴스를 재생성하지 않습니다.
     //        AndroidView의 factory 블록에서 생성한 View를 캐싱하는 역할을 합니다.
@@ -65,21 +69,29 @@ fun SeaThermoWebView(
 
             // ── 3. JS Bridge (appBridge) ──────────────────────────────
             // iOS: window.webkit.messageHandlers.appBridge.postMessage("close")
-            // Android: window.Android.postMessage("close")
+            // Android: window.appBridge.postMessage("close") (새 권장 방식)
+            //          window.Android.postMessage("close") (기존 호환성용)
             //
-            // 서버 웹 페이지가 iOS 방식(window.webkit.messageHandlers.appBridge)으로
-            // 호출하도록 설계되어 있으므로, JavaScript 심(shim)을 주입하여 동일하게 동작시킵니다.
+            // 서버 웹 페이지가 iOS 방식 또는 새 Android 브릿지 방식(window.appBridge)으로
+            // 호출하도록 설계되어 있으므로, 인터페이스를 등록합니다.
             // [개념] addJavascriptInterface()로 Kotlin 객체를 JavaScript에서 접근 가능하게 합니다.
             //        @JavascriptInterface 어노테이션이 붙은 메서드만 JS에서 호출할 수 있습니다.
-            addJavascriptInterface(
-                AppBridgeInterface(onClose = {
-                    // [개념] JS는 백그라운드 스레드에서 실행될 수 있으므로
-                    //        메인 스레드(UI 스레드)에서 네비게이션 처리가 필요합니다.
-                    //        iOS의 Task { @MainActor in self.onPop() }에 대응합니다.
-                    Handler(Looper.getMainLooper()).post { onNavigateBack() }
-                }),
-                "Android"
-            )
+            val bridgeInterface = AppBridgeInterface(onClose = {
+                Log.d(TAG, "Bridge: Closing Web Page")
+                // [개념] JS는 백그라운드 스레드에서 실행될 수 있으므로
+                //        메인 스레드(UI 스레드)에서 네비게이션 처리가 필요합니다.
+                //        iOS의 Task { @MainActor in self.onPop() }에 대응합니다.
+                Handler(Looper.getMainLooper()).post { 
+                    Log.d(TAG, "Bridge: Executing onNavigateBack")
+                    onNavigateBack() 
+                }
+            })
+
+            // 가이드에 따른 'appBridge' 등록 (window.appBridge.postMessage 호출 대응)
+            addJavascriptInterface(bridgeInterface, "appBridge")
+
+            // 기존 'Android' 인터페이스 유지 (하위 호환성)
+            addJavascriptInterface(bridgeInterface, "Android")
 
             // ── 4. WebViewClient ──────────────────────────────────────
             // [개념] WebViewClient는 WebView의 페이지 로드 이벤트를 처리합니다.
@@ -91,6 +103,7 @@ fun SeaThermoWebView(
                 //        window.webkit.messageHandlers.appBridge를 Android 브릿지로 연결합니다.
                 override fun onPageFinished(view: WebView?, pageUrl: String?) {
                     super.onPageFinished(view, pageUrl)
+                    Log.d(TAG, "Page Finished: $pageUrl")
                     view?.evaluateJavascript(WEBKIT_BRIDGE_SHIM, null)
                 }
 
@@ -102,6 +115,7 @@ fun SeaThermoWebView(
                     error: WebResourceError?
                 ) {
                     super.onReceivedError(view, request, error)
+                    Log.e(TAG, "Page Error: ${error?.description} at ${request?.url}")
                     // TODO: 에러 UI 표시 (필요 시)
                 }
             }
@@ -120,6 +134,7 @@ fun SeaThermoWebView(
         factory = { webView },
         update = { view ->
             val extraHeaders = buildAppInfoHeaders()
+            Log.d(TAG, "Loading URL with headers: $url")
             view.loadUrl(url, extraHeaders)
         }
     )
@@ -142,6 +157,7 @@ private class AppBridgeInterface(private val onClose: () -> Unit) {
      */
     @JavascriptInterface
     fun postMessage(message: String) {
+        Log.d("SeaThermoWebView", "JS Message Received: $message")
         when (message) {
             "close" -> onClose()
             // 향후 share, login 등 메시지 추가 가능

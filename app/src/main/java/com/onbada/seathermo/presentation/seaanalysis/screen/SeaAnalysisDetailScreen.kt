@@ -188,8 +188,7 @@ private fun DetailNavBar(onNavigateBack: () -> Unit) {
             .background(PageBackground)
             // [개념] statusBarsPadding()은 상태바 높이를 top padding으로 추가합니다.
             //        Android 12+에서도 동작하며 iOS safe area top과 동일한 역할입니다.
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(start = 16.dp, top = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(

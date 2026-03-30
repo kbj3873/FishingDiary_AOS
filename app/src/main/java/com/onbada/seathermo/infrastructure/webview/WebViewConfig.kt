@@ -14,7 +14,7 @@ package com.onbada.seathermo.infrastructure.webview
  */
 enum class WebPage(val path: String, val key: String) {
     NOTICES("/notices-page/", "notices"),   // 공지사항
-    LICENSES("/licenses/", "licenses");     // 오픈소스 라이선스
+    LICENSES("/licenses/AOS/", "licenses"); // 오픈소스 라이선스
 
     companion object {
         /**

@@ -21,11 +21,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,6 +49,61 @@ import com.onbada.seathermo.common.utils.AppPreferences
 import com.onbada.seathermo.common.utils.PreferenceConstants
 import com.onbada.seathermo.domain.entity.Region
 import com.onbada.seathermo.domain.entity.Sea
+
+/**
+ * 수온분석 탭 내부 Navigation Host.
+ *
+ * [개념] HistoryTabNavHost와 동일한 패턴으로, 수온분석 탭 내부에서
+ *        목록(sea_analysis) ↔ 상세(sea_analysis_detail) 전환을 처리합니다.
+ *        AppNavigation 레벨에서 분리함으로써:
+ *        1. alpha(0f) 탭의 터치 pass-through 문제 해결
+ *        2. popBackStack 시 MainTabScreen 재구성(흰 화면) 문제 해결
+ *
+ * @param diContainer ViewModel factory 제공용 DI 컨테이너
+ * @param modifier    Composable 크기/위치 조정용
+ */
+@Composable
+fun SeaAnalysisTabNavHost(
+    diContainer: ApplicationDIContainer,
+    modifier: Modifier = Modifier
+) {
+    val navController = rememberNavController()
+
+    NavHost(
+        navController = navController,
+        startDestination = "sea_analysis",
+        modifier = modifier.fillMaxSize()
+    ) {
+        // 수온분석 메인 화면
+        composable(
+            route = "sea_analysis",
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None }
+        ) {
+            SeaAnalysisScreen(
+                diContainer = diContainer,
+                onNavigateToDetail = { _, stationCode ->
+                    navController.navigate("sea_analysis_detail/$stationCode")
+                }
+            )
+        }
+        // 수온분석 상세 화면
+        composable(
+            route = "sea_analysis_detail/{stationCode}",
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
+        ) { backStackEntry ->
+            val stationCode = backStackEntry.arguments?.getString("stationCode") ?: return@composable
+            SeaAnalysisDetailScreen(
+                stationCode = stationCode,
+                diContainer = diContainer,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+    }
+}
 
 /**
  * 수온 분석 메인 화면 (해역 선택).

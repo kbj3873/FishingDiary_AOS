@@ -20,11 +20,9 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -39,6 +37,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.onbada.seathermo.domain.entity.MapType
 import com.onbada.seathermo.infrastructure.webview.WebPage
+import com.onbada.seathermo.presentation.common.components.CommonPopupOverlay
+import com.onbada.seathermo.presentation.common.components.PopupLayoutType
 import com.onbada.seathermo.presentation.setting.viewmodel.SettingViewModel
 
 // ── 색상 상수 ─────────────────────────────────────────────
@@ -86,18 +86,16 @@ fun SettingScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     // 낚시 기록 중 지도 변경 차단 팝업
-    // [개념] if (condition) { AlertDialog { } }는 조건부 Composable 렌더링입니다.
-    //        uiState.showRecordingBlockedDialog가 true일 때만 Dialog가 Composition에 포함됩니다.
+    // [개념] CommonPopupOverlay는 딤 배경 + 팝업 카드를 한 번에 처리합니다.
+    //        iOS의 CommonPopupView(layoutType: .horizontal)에 대응합니다.
     if (uiState.showRecordingBlockedDialog) {
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissRecordingBlockedDialog() },
-            title = { Text(text = "지도 변경 불가") },
-            text = { Text(text = "낚시 기록 중에는 지도 타입을 변경할 수 없습니다.\n기록을 종료한 후 변경해 주세요.") },
-            confirmButton = {
-                TextButton(onClick = { viewModel.dismissRecordingBlockedDialog() }) {
-                    Text(text = "확인")
-                }
-            }
+        CommonPopupOverlay(
+            title = "지도 변경 불가",
+            message = "낚시 기록 중에는 지도 타입을 변경할 수 없습니다.\n기록을 종료한 후 변경해 주세요.",
+            layoutType = PopupLayoutType.Horizontal,
+            primaryButtonText = "확인",
+            onPrimaryClick = { viewModel.dismissRecordingBlockedDialog() },
+            onDismiss = { viewModel.dismissRecordingBlockedDialog() }
         )
     }
 

@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
@@ -339,7 +341,12 @@ fun FishingRecordScreen(
                 FDAppManager.FishingState.DRIFTING -> R.drawable.ic_map_marker_orange
                 FDAppManager.FishingState.FISHING -> R.drawable.ic_map_marker_red
             }
-            val bitmap = BitmapFactory.decodeResource(context.resources, iconResId)
+            // [개념] BitmapFactory.decodeResource는 파일 I/O를 포함하는 작업으로 메인 스레드에서 실행하면
+            //        프레임 드롭이 발생할 수 있습니다. withContext(Dispatchers.IO)로 백그라운드에서 디코딩 후
+            //        결과만 메인 스레드로 가져와 addMarker()에 사용합니다.
+            val bitmap = withContext(Dispatchers.IO) {
+                BitmapFactory.decodeResource(context.resources, iconResId)
+            }
             map.addMarker(
                 MarkerOptions()
                     .position(LatLng(stateMarker.latitude, stateMarker.longitude))
@@ -361,7 +368,10 @@ fun FishingRecordScreen(
 
         val newPhotoMarkers = uiState.photoMarkers.drop(lastDrawnPhotoMarkerCount)
         newPhotoMarkers.forEach { photoMarker ->
-            val thumbnailBitmap = loadPhotoMarkerBitmap(context, photoMarker.thumbnailPath)
+            // [개념] 썸네일 비트맵 생성(파일 읽기 + 캔버스 드로잉)을 IO 스레드에서 처리합니다.
+            val thumbnailBitmap = withContext(Dispatchers.IO) {
+                loadPhotoMarkerBitmap(context, photoMarker.thumbnailPath)
+            }
             val icon = thumbnailBitmap?.let { BitmapDescriptorFactory.fromBitmap(it) }
                 ?: BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN)
             map.addMarker(
@@ -527,15 +537,19 @@ fun FishingRecordScreen(
                 FDAppManager.FishingState.DRIFTING -> R.drawable.ic_map_marker_orange
                 FDAppManager.FishingState.FISHING -> R.drawable.ic_map_marker_red
             }
-            val bitmap = BitmapFactory.decodeResource(context.resources, iconResId)
-            // Kakao SDK는 비트맵 픽셀을 dp처럼 처리하므로 density로 나눠 Google Maps와 동일한 시각적 크기로 맞춥니다.
-            // KakaoHistoryMapView의 상태 마커 스케일링과 동일한 로직입니다.
-            val scaledBitmap = android.graphics.Bitmap.createScaledBitmap(
-                bitmap,
-                (bitmap.width / density * 2).toInt(),
-                (bitmap.height / density * 2).toInt(),
-                true
-            )
+            // [개념] BitmapFactory.decodeResource + createScaledBitmap은 I/O 및 CPU 작업이므로
+            //        withContext(Dispatchers.IO)로 백그라운드 처리합니다.
+            val scaledBitmap = withContext(Dispatchers.IO) {
+                val bitmap = BitmapFactory.decodeResource(context.resources, iconResId)
+                // Kakao SDK는 비트맵 픽셀을 dp처럼 처리하므로 density로 나눠 Google Maps와 동일한 시각적 크기로 맞춥니다.
+                // KakaoHistoryMapView의 상태 마커 스케일링과 동일한 로직입니다.
+                android.graphics.Bitmap.createScaledBitmap(
+                    bitmap,
+                    (bitmap.width / density * 2).toInt(),
+                    (bitmap.height / density * 2).toInt(),
+                    true
+                )
+            }
             // [개념] Kakao Maps 마커는 LabelOptions에 LabelStyle을 설정하여 추가합니다.
             //        LabelStyle.from(Bitmap)으로 비트맵 기반 스타일을 직접 생성할 수 있습니다.
             val labelOptions = LabelOptions.from(
@@ -556,8 +570,10 @@ fun FishingRecordScreen(
         newPhotoMarkers.forEach { photoMarker ->
             // Kakao SDK는 비트맵 픽셀을 dp처럼 처리하므로 density를 곱하지 않은 전용 함수를 사용합니다.
             // (Google Maps용 loadPhotoMarkerBitmap은 density를 곱한 px 값을 사용하여 Kakao에서 너무 크게 표시됨)
-            val thumbnailBitmap = loadKakaoPhotoMarkerBitmap(context, photoMarker.thumbnailPath)
-                ?: return@forEach
+            // [개념] 썸네일 파일 읽기 + Canvas 드로잉을 IO 스레드에서 처리합니다.
+            val thumbnailBitmap = withContext(Dispatchers.IO) {
+                loadKakaoPhotoMarkerBitmap(context, photoMarker.thumbnailPath)
+            } ?: return@forEach
             val labelOptions = LabelOptions.from(
                 KakaoLatLng.from(photoMarker.latitude, photoMarker.longitude)
             ).setStyles(LabelStyle.from(thumbnailBitmap))

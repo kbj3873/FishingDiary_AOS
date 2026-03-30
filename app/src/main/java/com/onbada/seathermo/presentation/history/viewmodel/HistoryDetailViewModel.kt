@@ -5,11 +5,13 @@ import androidx.lifecycle.viewModelScope
 import com.onbada.seathermo.domain.entity.FishingRecord
 import com.onbada.seathermo.domain.usecase.FishingRecordUseCase
 import com.onbada.seathermo.managers.FDAppManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
 import android.location.Location
@@ -43,9 +45,14 @@ class HistoryDetailViewModel(
                     .sortedBy { it.date }
                 
                 if (sessionRecords.isNotEmpty()) {
-                    processRecords(sessionRecords)
+                    // [개념] withContext(Dispatchers.Default)는 CPU 집약적 연산을 백그라운드 스레드에서 실행합니다.
+                    //        수천 개 GPS 포인트의 루프 순회·폴리라인 세그먼트 생성이 메인 스레드를 블로킹하지 않도록
+                    //        백그라운드로 이동합니다. iOS의 Task.detached(priority: .userInitiated)에 대응합니다.
+                    withContext(Dispatchers.Default) {
+                        processRecords(sessionRecords)
+                    }
                 }
-                
+
                 _uiState.update { it.copy(isLoading = false) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false, errorMessage = e.message) }

@@ -85,7 +85,15 @@ fun GoogleHistoryMapView(
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            // [개념] popBackStack() 시 observer가 제거된 후 lifecycle ON_PAUSE 이벤트를 받지 못하므로
+            //        mapView.onPause()가 호출되지 않습니다. SurfaceView 기반인 Google MapView는
+            //        pause 없이 surface가 즉시 파괴되면 검정 배경이 1프레임 노출(깜빡임)됩니다.
+            //        onDispose에서 명시적으로 onPause()를 호출해 surface를 정상 정리합니다.
+            //        Kakao의 onDispose { mapView.pause() } 패턴과 동일한 의도입니다.
+            mapView.onPause()
+        }
     }
 
     // 지도 준비 후 데이터를 한 번에 렌더링합니다.

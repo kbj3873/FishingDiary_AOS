@@ -35,7 +35,7 @@ import com.onbada.seathermo.presentation.currenttemperature.screen.CrawlingCurre
 import com.onbada.seathermo.presentation.currenttemperature.viewmodel.CrawlingCurrentTemperatureViewModel
 import com.onbada.seathermo.presentation.fishingrecord.screen.FishingRecordScreen
 import com.onbada.seathermo.presentation.fishingrecord.viewmodel.FishingRecordViewModel
-import com.onbada.seathermo.presentation.seaanalysis.screen.SeaAnalysisScreen
+import com.onbada.seathermo.presentation.seaanalysis.screen.SeaAnalysisTabNavHost
 import com.onbada.seathermo.infrastructure.webview.WebPage
 import com.onbada.seathermo.presentation.history.screen.HistoryTabNavHost
 import com.onbada.seathermo.presentation.setting.screen.SettingScreen
@@ -61,11 +61,6 @@ private val TabBarDividerColor = Color(0x1A000000)
 @Composable
 fun MainTabScreen(
     diContainer: ApplicationDIContainer,
-    // SeaAnalysisDetailScreen으로 이동하는 콜백.
-    // [개념] 콜백 파라미터로 Navigation 의존성을 AppNavigation에 위임합니다.
-    //        MainTabScreen은 navController를 직접 보유하지 않아 결합도를 낮춥니다.
-    //        iOS의 @EnvironmentObject로 전달하는 패턴과 동일한 의도입니다.
-    onNavigateToSeaAnalysisDetail: (stationCode: String) -> Unit = {},
     onNavigateToWebPage: (WebPage) -> Unit = {}
 ) {
     // 현재 선택된 탭 인덱스 상태 관리.
@@ -196,11 +191,8 @@ fun MainTabScreen(
                                 diContainer = diContainer
                             )
                         }
-                        TabItem.Analysis -> SeaAnalysisScreen(
-                            diContainer = diContainer,
-                            onNavigateToDetail = { _, stationCode ->
-                                onNavigateToSeaAnalysisDetail(stationCode)
-                            }
+                        TabItem.Analysis -> SeaAnalysisTabNavHost(
+                            diContainer = diContainer
                         )
                         TabItem.FishingRecord -> {
                             val fishingRecordViewModel: FishingRecordViewModel = viewModel(

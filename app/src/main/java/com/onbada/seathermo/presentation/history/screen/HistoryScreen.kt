@@ -109,7 +109,13 @@ fun HistoryTabNavHost(
         modifier = modifier.fillMaxSize()
     ) {
         // 히스토리 목록 화면
-        composable("history_list") {
+        // [개념] exitTransition = None: history_detail로 이동할 때 목록 화면의 슬라이드 아웃 애니메이션을 제거합니다.
+        //        popEnterTransition = None: 상세에서 뒤로 올 때 목록 화면의 슬라이드 인 애니메이션을 제거합니다.
+        composable(
+            route = "history_list",
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None }
+        ) {
             val historyViewModel: HistoryViewModel = viewModel(
                 factory = diContainer.makeHistoryViewModelFactory()
             )
@@ -129,11 +135,13 @@ fun HistoryTabNavHost(
         composable(
             route = "history_detail/{sessionId}",
             enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
             // [개념] popExitTransition을 None으로 설정합니다.
             //        탭 전환 시 LaunchedEffect(isVisible)에서 popBackStack()이 호출되면
             //        slideOutHorizontally가 실행되어 스와이프 닫힘 모션이 생깁니다.
             //        AndroidView(KakaoMapView)는 Compose 애니메이션에 참여하지 않으므로
             //        애니메이션 없이 즉시 닫는 것이 더 자연스럽습니다.
+            popEnterTransition = { EnterTransition.None },
             popExitTransition = { ExitTransition.None }
         ) { backStackEntry ->
             val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable

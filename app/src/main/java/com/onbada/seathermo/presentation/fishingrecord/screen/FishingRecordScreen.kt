@@ -5,6 +5,9 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -49,6 +52,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
@@ -72,6 +78,7 @@ import com.kakao.vectormap.shape.PolylineStyle
 import com.kakao.vectormap.shape.ShapeLayer
 import com.kakao.vectormap.shape.ShapeLayerOptions
 import com.onbada.seathermo.R
+import com.onbada.seathermo.domain.entity.MapLineInfo
 import com.onbada.seathermo.domain.entity.MapType
 import com.onbada.seathermo.managers.FDAppManager
 import com.onbada.seathermo.presentation.fishingrecord.screen.components.GoogleRecordMapView
@@ -224,6 +231,33 @@ fun FishingRecordScreen(
     // 이전 isRecording 값 추적 (녹화 중단 시점 감지용)
     var wasRecording by remember { mutableStateOf(false) }
 
+    // 포그라운드 복귀 직후 버스트 구간 제어 플래그.
+    // [개념] 백그라운드에서 쌓인 GPS 이벤트들이 포그라운드 복귀 시 한꺼번에 처리되면
+    //        addPolyline()이 N번 호출되어 경로가 하나씩 그려지는 애니메이션 현상이 발생합니다.
+    //        ON_RESUME 시 이 플래그를 true로 설정하고, 버스트 구간에는 경로를 누적만 합니다.
+    //        0.5초 debounce 완료 후 누적 경로를 1회 렌더링하고 플래그를 해제합니다.
+    //        iOS의 needsFullRouteRefresh 플래그와 동일한 역할입니다.
+    var needsFullRouteRefresh by remember { mutableStateOf(false) }
+    // 버스트 구간에서 수신된 가장 최신 위치 좌표.
+    // debounce 완료 시 카메라 이동 및 위치 마커 이동에 사용합니다.
+    // [개념] iOS의 latestLocationDuringRefresh에 대응합니다.
+    var latestLocationDuringBurst by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+
+    // 포그라운드/백그라운드 전환 감지: ON_RESUME 시 버스트 처리 모드를 활성화합니다.
+    // [개념] DisposableEffect + LifecycleEventObserver로 Activity Lifecycle 이벤트를 구독합니다.
+    //        iOS의 didBecomeActive 알림 수신에 대응합니다.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                needsFullRouteRefresh = true
+                latestLocationDuringBurst = null
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     // onAppear: 위치 모니터링 시작 + 위치 권한 즉시 요청.
     // [개념] LaunchedEffect(Unit)은 Composable이 처음 화면에 등장할 때 한 번 실행됩니다.
     //        iOS의 .onAppear { viewModel.startMonitoring() }에 대응합니다.
@@ -301,7 +335,20 @@ fun FishingRecordScreen(
     //        - 신규: LaunchedEffect의 코루틴은 composable이 composition을 떠나기 전까지 유지됨
     //                백그라운드로 내려도 코루틴은 계속 실행되므로 모든 경로 이벤트를 처리함
     //        iOS의 UIViewRepresentable Coordinator가 라이프사이클 무관하게 동작하는 것과 동일합니다.
+    //
+    // [버스트 처리] 포그라운드 복귀 직후 쌓인 이벤트가 순차 처리되면 addPolyline()이 N번 호출되어
+    //               경로가 하나씩 그려지는 애니메이션 현상이 발생합니다.
+    //               needsFullRouteRefresh 구간에는 경로 데이터를 누적만 하고,
+    //               0.5초 debounce 완료 후 누적 데이터를 1회 렌더링합니다.
+    //               iOS의 appendPolyline() / renderPolylines() 분리 패턴에 대응합니다.
     LaunchedEffect(viewModel) {
+        // [개념] LaunchedEffect 블록은 CoroutineScope이지만, collect { } 람다는 별도 suspend 람다입니다.
+        //        collect 람다 안에서 launch { }를 호출하려면 외부 scope를 명시적으로 캡처해야 합니다.
+        //        iOS의 handler.postDelayed()에 대응하는 코루틴 debounce 패턴입니다.
+        val scope = this
+        var debounceJob: Job? = null
+        val pendingPolylines = mutableListOf<Pair<MapLineInfo, FDAppManager.FishingState>>()
+
         viewModel.mapLineEvents.collect { (mapLine, fishingState) ->
             val map = googleMap ?: return@collect
             if (!viewModel.uiState.value.isRecording) return@collect
@@ -311,6 +358,53 @@ fun FishingRecordScreen(
             val currLat = mapLine.currentLocation.latitude
             val currLon = mapLine.currentLocation.longitude
 
+            if (needsFullRouteRefresh) {
+                // ── 버스트 구간: 렌더링 없이 누적만 ──────────────────────────────
+                // [개념] iOS의 appendPolyline()에 대응합니다.
+                if (prevLat != 0.0 && prevLon != 0.0 && currLat != 0.0 && currLon != 0.0) {
+                    pendingPolylines.add(mapLine to fishingState)
+                }
+                if (currLat != 0.0 && currLon != 0.0) {
+                    latestLocationDuringBurst = currLat to currLon
+                }
+                // debounce 재예약: 새 이벤트가 올 때마다 0.5초 타이머를 리셋합니다.
+                // [개념] iOS의 scheduleRefreshPOI() debounce 구조에 대응합니다.
+                debounceJob?.cancel()
+                debounceJob = scope.launch {
+                    delay(500)
+                    // ── debounce 완료: 누적 경로 1회 렌더링 ──────────────────────
+                    // [개념] iOS의 renderPolylines() + moveCameraToLocation()에 대응합니다.
+                    val currentMap = googleMap
+                    if (currentMap != null) {
+                        pendingPolylines.forEach { (line, state) ->
+                            val pLat = line.previousLocation.latitude
+                            val pLon = line.previousLocation.longitude
+                            val cLat = line.currentLocation.latitude
+                            val cLon = line.currentLocation.longitude
+                            val lineColor = stateLineColor(state)
+                            currentMap.addPolyline(
+                                PolylineOptions()
+                                    .add(LatLng(pLat, pLon), LatLng(cLat, cLon))
+                                    .width(8f)
+                                    .color(lineColor.toArgb())
+                                    .geodesic(false)
+                            )
+                        }
+                        // 카메라를 현재 위치로 이동합니다.
+                        latestLocationDuringBurst?.let { (lat, lon) ->
+                            currentMap.animateCamera(
+                                CameraUpdateFactory.newLatLng(LatLng(lat, lon))
+                            )
+                        }
+                    }
+                    pendingPolylines.clear()
+                    latestLocationDuringBurst = null
+                    needsFullRouteRefresh = false
+                }
+                return@collect
+            }
+
+            // ── 일반 구간: 기존 즉시 렌더링 ─────────────────────────────────────
             // 유효한 좌표 (0,0이 아닌 경우)일 때만 경로선 추가
             if (prevLat != 0.0 && prevLon != 0.0 && currLat != 0.0 && currLon != 0.0) {
                 // [개념] fishingState는 이벤트 발행 시점의 상태값을 그대로 사용합니다.
@@ -483,11 +577,16 @@ fun FishingRecordScreen(
 
     // ── Kakao 경로선 그리기 ────────────────────────────────────────────────
     // Google의 LaunchedEffect(viewModel) { mapLineEvents.collect { } }에 대응합니다.
+    // Google Maps와 동일한 버스트 처리 로직을 적용합니다.
     LaunchedEffect(viewModel) {
         // [개념] Label.moveTo()로 위치 마커를 이동합니다. 레이어를 재생성하지 않아 성능이 좋습니다.
         //        kakaoLocationLabel은 Screen 레벨 공유 변수입니다.
         //        LaunchedEffect(kakaoMap, locationPermissionGranted)에서 초기 마커를 추가하고
         //        이 coroutine에서 moveTo()로 갱신하여 마커가 중복 생성되지 않습니다.
+        val scope = this
+        var debounceJob: Job? = null
+        val pendingPolylines = mutableListOf<Pair<MapLineInfo, FDAppManager.FishingState>>()
+
         viewModel.mapLineEvents.collect { (mapLine, fishingState) ->
             val layer = kakaoPolyLayer ?: return@collect
             if (!viewModel.uiState.value.isRecording) return@collect
@@ -497,6 +596,58 @@ fun FishingRecordScreen(
             val currLat = mapLine.currentLocation.latitude
             val currLon = mapLine.currentLocation.longitude
 
+            if (needsFullRouteRefresh) {
+                // ── 버스트 구간: 렌더링/마커 이동 없이 누적만 ───────────────────
+                if (prevLat != 0.0 && prevLon != 0.0 && currLat != 0.0 && currLon != 0.0) {
+                    pendingPolylines.add(mapLine to fishingState)
+                }
+                if (currLat != 0.0 && currLon != 0.0) {
+                    latestLocationDuringBurst = currLat to currLon
+                }
+                debounceJob?.cancel()
+                debounceJob = scope.launch {
+                    delay(500)
+                    // ── debounce 완료: 누적 경로 1회 렌더링 + 마커/카메라 이동 ──
+                    val currentLayer = kakaoPolyLayer
+                    val currentMap = kakaoMap
+                    if (currentLayer != null) {
+                        pendingPolylines.forEach { (line, state) ->
+                            val pLat = line.previousLocation.latitude
+                            val pLon = line.previousLocation.longitude
+                            val cLat = line.currentLocation.latitude
+                            val cLon = line.currentLocation.longitude
+                            val color = stateLineColor(state).toArgb()
+                            // [개념] Kakao Maps는 MapPoints + PolylineStyle로 폴리라인을 정의합니다.
+                            val mapPoints = MapPoints.fromLatLng(listOf(
+                                KakaoLatLng.from(pLat, pLon),
+                                KakaoLatLng.from(cLat, cLon)
+                            ))
+                            currentLayer.addPolyline(KakaoPolylineOptions.from(mapPoints, PolylineStyle.from(8f, color)))
+                        }
+                    }
+                    // 현재 위치 마커 이동 및 카메라를 현재 위치로 이동합니다.
+                    // [개념] iOS의 moveCurrentPoi(latest) + moveCameraToLocation()에 대응합니다.
+                    latestLocationDuringBurst?.let { (lat, lon) ->
+                        val existingLabel = kakaoLocationLabel
+                        if (existingLabel != null) {
+                            existingLabel.moveTo(KakaoLatLng.from(lat, lon))
+                        } else {
+                            kakaoLocationLabel = showKakaoLocationMarker(
+                                context, kakaoLocationLabelLayer, lat, lon
+                            )
+                        }
+                        currentMap?.moveCamera(
+                            KakaoCameraUpdateFactory.newCenterPosition(KakaoLatLng.from(lat, lon))
+                        )
+                    }
+                    pendingPolylines.clear()
+                    latestLocationDuringBurst = null
+                    needsFullRouteRefresh = false
+                }
+                return@collect
+            }
+
+            // ── 일반 구간: 기존 즉시 렌더링 ─────────────────────────────────────
             if (prevLat != 0.0 && prevLon != 0.0 && currLat != 0.0 && currLon != 0.0) {
                 val color = stateLineColor(fishingState).toArgb()
                 // [개념] Kakao Maps는 MapPoints + PolylineStyle로 폴리라인을 정의합니다.

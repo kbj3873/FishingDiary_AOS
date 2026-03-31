@@ -93,20 +93,23 @@ class HistoryDetailViewModel(
             val state = record.state
             val timeStr = timeSdf.format(Date(record.date))
 
-            // 상태 변경 지점 마커 (이전과 상태가 달라지는 지점)
-            if (lastState != null && lastState != state) {
+            // 상태 변경 지점 마커 (이동 → 탐색/낚시 전환 시에만 생성)
+            // 마커 위치는 MOVING의 마지막 좌표(currentPath.last())에 찍어야 색상 전환 지점과 일치합니다.
+            // coord는 이미 새 상태(DRIFTING/FISHING)의 첫 좌표이므로 사용하지 않습니다.
+            if (lastState == 0 && state != 0) {
                 val markerState = when (state) {
                     0 -> FDAppManager.FishingState.MOVING
                     1 -> FDAppManager.FishingState.DRIFTING
                     else -> FDAppManager.FishingState.FISHING
                 }
-                
+                val markerCoord = if (currentPath.isNotEmpty()) currentPath.last() else coord
+
                 stateMarkers.add(HistoryStateMarker(
                     id = UUID.randomUUID().toString(),
                     title = "지점 #$pointIndex",
                     timeString = timeStr,
-                    latitude = coord.latitude,
-                    longitude = coord.longitude,
+                    latitude = markerCoord.latitude,
+                    longitude = markerCoord.longitude,
                     state = markerState
                 ))
                 pointIndex++

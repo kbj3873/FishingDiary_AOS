@@ -39,9 +39,9 @@ class LocationTrackingService : Service() {
         private const val CHANNEL_NAME = "위치 추적"
 
         // LocationRequest 설정
-        private const val UPDATE_INTERVAL_MS = 1000L        // 1초마다 업데이트
-        private const val FASTEST_INTERVAL_MS = 500L        // 최소 0.5초 간격
-        private const val SMALLEST_DISPLACEMENT_M = 1f      // 최소 1m 이동 시 업데이트
+        private const val UPDATE_INTERVAL_MS = 2000L        // 2초마다 업데이트
+        private const val FASTEST_INTERVAL_MS = 1000L       // 최소 1초 간격
+        private const val SMALLEST_DISPLACEMENT_M = 2f      // 최소 2m 이동 시 업데이트
 
         /**
          * 서비스 시작

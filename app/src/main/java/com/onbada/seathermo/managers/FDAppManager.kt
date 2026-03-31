@@ -62,8 +62,8 @@ class FDAppManager private constructor() {
         const val POINT_VELOCITY: Float = 2 * KMH_KNOT  // 약 3.7 km/h
 
         // [추가] 낚시 상태 판별을 위한 속도 임계값 (knots)
-        const val SPEED_THRESHOLD_HIGH = 3.0 // 3노트 이상: 이동 중 (Moving)
-        const val SPEED_THRESHOLD_LOW = 0.5  // 0.5~3노트: 탐색 중 (Drifting)
+        const val SPEED_THRESHOLD_HIGH = 2.0 // 2노트 이상: 이동 중 (Moving)
+        const val SPEED_THRESHOLD_LOW = 0.5  // 0.5~2노트: 탐색 중 (Drifting)
         // 0.5노트 미만: 낚시 중 (Fishing)
     }
 

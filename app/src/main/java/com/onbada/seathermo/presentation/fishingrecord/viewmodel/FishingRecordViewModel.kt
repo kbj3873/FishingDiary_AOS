@@ -64,12 +64,8 @@ class FishingRecordViewModel(
     private var lastSavedTime: Long = 0
     private val saveIntervalMs: Long = 3000 // 3초 간격 자동 저장
 
-    // 상태 변경 debounce: 동일한 후보 상태가 연속 N회 측정되어야 상태를 확정합니다.
-    // [이유] GPS 속도는 순간적으로 임계값을 넘나들 수 있어 단일 측정만으로 상태를 바꾸면
-    //        빠른 진동으로 불필요한 마커가 과도하게 생성됩니다.
-    private var pendingState: FDAppManager.FishingState? = null
-    private var pendingStateCount: Int = 0
-    private val stateConfirmThreshold: Int = 3 // 3회 연속 같은 상태여야 확정
+    // [변경] 2m 거리 필터로 GPS 노이즈가 자연 억제되므로 debounce 없이 즉시 상태를 확정합니다.
+    //        iOS FishingRecordViewModel과 동일한 방식입니다.
 
     /**
      * 위치 업데이트 구독 시작.
@@ -109,20 +105,8 @@ class FishingRecordViewModel(
             else -> FDAppManager.FishingState.FISHING
         }
 
-        // 2-1. 상태 debounce: 후보 상태가 stateConfirmThreshold 회 연속 측정되어야 확정합니다.
-        // [이유] GPS 속도는 순간적으로 임계값을 넘나들 수 있어, 단일 측정으로 상태를 바꾸면
-        //        빠른 진동(FISHING→DRIFTING→FISHING)으로 불필요한 마커가 과도하게 생성됩니다.
-        if (candidateState == pendingState) {
-            pendingStateCount++
-        } else {
-            pendingState = candidateState
-            pendingStateCount = 1
-        }
-        // 아직 확정되지 않은 경우 UI 속도/거리만 최신값으로 유지하고 상태 처리를 건너뜁니다.
-        val confirmedState = if (pendingStateCount >= stateConfirmThreshold) candidateState else {
-            // 현재 확정 상태(lastFishingState)를 유지하되, 최초 기록 시작 직후에는 candidateState 사용
-            lastFishingState ?: candidateState
-        }
+        // 2m 거리 필터로 GPS 노이즈가 억제되므로 측정된 상태를 즉시 확정합니다.
+        val confirmedState = candidateState
 
         // 3. 거리 계산 (이전 지점과의 거리 누적)
         var distanceDelta = 0.0
@@ -131,7 +115,9 @@ class FishingRecordViewModel(
         }
 
         // 4. 상태 변경 감지 및 마커 추가 (확정된 상태 기준)
-        if (lastFishingState != null && lastFishingState != confirmedState && pendingStateCount >= stateConfirmThreshold) {
+        // 이동(MOVING) → 탐색/낚시 전환 시에만 마커 생성 (불필요한 마커 최소화)
+        if (lastFishingState == FDAppManager.FishingState.MOVING &&
+            confirmedState != FDAppManager.FishingState.MOVING) {
             // prevLocation → currentLocation 세그먼트가 confirmedState 색으로 그려지므로
             // 마커는 해당 세그먼트의 시작점 prevLocation에 찍습니다.
             // prevLocation이 유효하지 않으면(0,0) currentLocation으로 폴백합니다.
@@ -157,9 +143,7 @@ class FishingRecordViewModel(
                 state = confirmedState.value
             )
         }
-        if (pendingStateCount >= stateConfirmThreshold) {
-            lastFishingState = confirmedState
-        }
+        lastFishingState = confirmedState
 
         // 5. 주기적 자동 저장 (3초 간격)
         val currentTime = System.currentTimeMillis()
@@ -200,8 +184,6 @@ class FishingRecordViewModel(
 
         currentSessionId = UUID.randomUUID().toString()
         lastFishingState = null
-        pendingState = null
-        pendingStateCount = 0
         lastSavedTime = System.currentTimeMillis()
         
         _uiState.update { it.copy(

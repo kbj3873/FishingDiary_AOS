@@ -204,4 +204,10 @@ object PreferenceConstants {
      * Whether the onboarding process has been completed
      */
     const val HAS_COMPLETED_ONBOARDING = "hasCompletedOnboarding"
+
+    /**
+     * 낚시 기록 위치 수집 안내 팝업 확인 여부 (최초 1회)
+     * Whether the user has confirmed the location data collection disclosure
+     */
+    const val HAS_SEEN_LOCATION_DISCLOSURE = "hasSeenLocationDisclosure"
 }

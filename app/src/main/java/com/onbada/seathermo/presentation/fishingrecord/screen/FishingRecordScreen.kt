@@ -258,6 +258,28 @@ fun FishingRecordScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    // 동의 완료(또는 기동의) 후 ViewModel이 shouldProceedToRecording = true를 신호하면
+    // Screen이 권한 체크 → 기록 시작 흐름을 실행합니다.
+    // [개념] ViewModel은 직접 권한 요청을 할 수 없으므로 State 플래그로 Screen에 위임합니다.
+    //        LaunchedEffect는 key 값이 false → true 로 바뀌는 순간만 재실행되므로
+    //        처리 후 clearProceedToRecording()으로 false로 되돌려야 다음 번에도 동작합니다.
+    LaunchedEffect(uiState.shouldProceedToRecording) {
+        if (uiState.shouldProceedToRecording) {
+            viewModel.clearProceedToRecording()
+            if (LocationPermissionHelper.hasLocationPermission(context)) {
+                viewModel.startRecording()
+            } else {
+                pendingStartRecording = true
+                locationPermissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                    )
+                )
+            }
+        }
+    }
+
     // onAppear: 위치 모니터링 시작 + 위치 권한 즉시 요청.
     // [개념] LaunchedEffect(Unit)은 Composable이 처음 화면에 등장할 때 한 번 실행됩니다.
     //        iOS의 .onAppear { viewModel.startMonitoring() }에 대응합니다.
@@ -899,19 +921,11 @@ fun FishingRecordScreen(
                     if (uiState.isRecording) {
                         viewModel.showStopPopup()
                     } else {
-                        // 위치 권한 체크 → 없으면 시스템 권한 다이얼로그 요청
-                        if (LocationPermissionHelper.hasLocationPermission(context)) {
-                            viewModel.startRecording()
-                        } else {
-                            // pendingStartRecording = true: 권한 허용 즉시 기록 시작
-                            pendingStartRecording = true
-                            locationPermissionLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION
-                                )
-                            )
-                        }
+                        // 기록 시작 전 위치 수집 안내 팝업을 먼저 노출합니다.
+                        // [개념] Google Play 정책상 위치 데이터를 수집하기 전
+                        //        앱이 수집 목적을 명확히 고지(in-app disclosure)해야 합니다.
+                        //        사용자가 "동의하고 시작"을 누른 후에 권한 요청으로 이어집니다.
+                        viewModel.showLocationDisclosurePopup()
                     }
                 },
                 onCameraClick = {
@@ -1031,6 +1045,23 @@ fun FishingRecordScreen(
                     viewModel.dismissPopups()
                     LocationPermissionHelper.openAppSettings(context)
                 },
+                secondaryButtonText = "취소",
+                onSecondaryClick = { viewModel.dismissPopups() },
+                onDismiss = { viewModel.dismissPopups() }
+            )
+        }
+
+        // ── 8. 팝업: 위치 정보 수집 안내 (기록 시작 전 in-app disclosure, 최초 1회) ─
+        // [개념] Google Play 정책은 위치 데이터 수집 전 수집 목적을 명시적으로 고지하도록 요구합니다.
+        //        "동의하고 시작" 탭 시 confirmLocationDisclosure()가 동의 여부를 SharedPreferences에 저장합니다.
+        //        이후 실행부터는 팝업 없이 shouldProceedToRecording 플래그로 바로 기록 시작 흐름에 진입합니다.
+        if (uiState.isLocationDisclosurePopupPresented) {
+            CommonPopupOverlay(
+                title = "위치 정보 수집 안내",
+                message = "'온바다'는 낚시 이동 경로를 끊김 없이 기록하기 위해, 기록 중에는 화면이 꺼지거나 다른 앱으로 이동해도 GPS 위치 정보를 계속 수집합니다.\n수집된 위치 정보는 기기 내 낚시 기록 저장에만 사용되며, 기록을 종료하면 수집이 중단됩니다.",
+                layoutType = PopupLayoutType.Vertical,
+                primaryButtonText = "동의하고 시작",
+                onPrimaryClick = { viewModel.confirmLocationDisclosure() },
                 secondaryButtonText = "취소",
                 onSecondaryClick = { viewModel.dismissPopups() },
                 onDismiss = { viewModel.dismissPopups() }

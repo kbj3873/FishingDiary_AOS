@@ -6,6 +6,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.onbada.seathermo.common.utils.AppPreferences
+import com.onbada.seathermo.common.utils.PreferenceConstants
 import com.onbada.seathermo.domain.entity.GeoPoint
 import com.onbada.seathermo.domain.entity.MapLineInfo
 import com.onbada.seathermo.domain.usecase.FishingRecordUseCase
@@ -290,6 +292,8 @@ class FishingRecordViewModel(
     fun dismissPopups() {
         _uiState.update { it.copy(
             isStopPopupPresented = false,
+            isLocationDisclosurePopupPresented = false,
+            shouldProceedToRecording = false,
             isLocationRationalePopupPresented = false,
             isLocationPermissionPopupPresented = false,
             isCameraRationalePopupPresented = false,
@@ -299,6 +303,40 @@ class FishingRecordViewModel(
 
     fun showStopPopup() {
         _uiState.update { it.copy(isStopPopupPresented = true) }
+    }
+
+    // 기록 시작 버튼 클릭 시 위치 수집 목적을 안내합니다.
+    // [개념] Google Play 정책상 위치 정보 수집 전 명확한 고지가 필요합니다.
+    //        최초 1회만 팝업을 표시하며, 이후에는 바로 기록 시작 흐름으로 진입합니다.
+    fun showLocationDisclosurePopup() {
+        val hasSeen = AppPreferences.getBoolean(
+            getApplication(),
+            PreferenceConstants.HAS_SEEN_LOCATION_DISCLOSURE
+        )
+        if (hasSeen) {
+            // 이미 동의한 경우: 팝업 없이 바로 진행 (Screen이 LaunchedEffect로 처리)
+            _uiState.update { it.copy(shouldProceedToRecording = true) }
+        } else {
+            // 최초 진입: 위치 수집 안내 팝업 표시
+            _uiState.update { it.copy(isLocationDisclosurePopupPresented = true) }
+        }
+    }
+
+    // 사용자가 위치 수집 안내에 동의한 경우 호출합니다.
+    // [개념] 동의 여부를 SharedPreferences에 저장하여 이후 실행 시 팝업을 생략합니다.
+    //        iOS의 UserDefaults.standard.set(true, forKey:)에 대응합니다.
+    fun confirmLocationDisclosure() {
+        AppPreferences.setBoolean(
+            getApplication(),
+            PreferenceConstants.HAS_SEEN_LOCATION_DISCLOSURE,
+            true
+        )
+        _uiState.update { it.copy(isLocationDisclosurePopupPresented = false, shouldProceedToRecording = true) }
+    }
+
+    // Screen이 shouldProceedToRecording 처리 완료 후 플래그를 초기화합니다.
+    fun clearProceedToRecording() {
+        _uiState.update { it.copy(shouldProceedToRecording = false) }
     }
 
     // [개념] 1차 거부 시 표시하는 Rationale 팝업 — 권한이 왜 필요한지 설명 후 재요청합니다.
@@ -357,6 +395,12 @@ data class FishingRecordUiState(
     val savedImagePaths: List<String> = emptyList(),
     val savedPointCount: Int = 0,
     val isStopPopupPresented: Boolean = false,
+    // 기록 시작 전 위치 수집 목적 안내 팝업 (Google Play 정책 대응, 최초 1회)
+    val isLocationDisclosurePopupPresented: Boolean = false,
+    // 동의 완료 후 Screen에서 권한 체크 → 기록 시작 흐름으로 진입하도록 신호
+    // [개념] ViewModel이 직접 권한 요청을 할 수 없으므로 State 플래그로 Screen에 위임합니다.
+    //        Screen의 LaunchedEffect가 이 값을 감지하여 처리한 뒤 clearProceedToRecording()으로 초기화합니다.
+    val shouldProceedToRecording: Boolean = false,
     // 위치 권한 1차 거부 시 — 재요청 안내 팝업
     val isLocationRationalePopupPresented: Boolean = false,
     // 위치 권한 영구 거부 시 — 시스템 설정 안내 팝업

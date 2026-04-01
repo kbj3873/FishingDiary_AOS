@@ -116,7 +116,16 @@ fun AppNavigation(diContainer: ApplicationDIContainer) {
                 val url = diContainer.appConfiguration.apiOnbadaURL + webPage.path
                 SeaThermoWebView(
                     url = url,
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = {
+                        // [방어처리] 현재 백스택 최상단이 webview 화면일 때만 pop합니다.
+                        // BackHandler가 1차로 중복 호출을 막지만, 혹시 빠른 연속 입력 등으로
+                        // onNavigateBack이 중복 호출되더라도 이미 main으로 복귀한 상태에서는
+                        // popBackStack()이 실행되지 않아 설정 화면이 닫히는 버그를 방지합니다.
+                        val currentRoute = navController.currentBackStackEntry?.destination?.route
+                        if (currentRoute?.startsWith("webview") == true) {
+                            navController.popBackStack()
+                        }
+                    }
                 )
             }
         }

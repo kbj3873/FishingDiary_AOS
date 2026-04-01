@@ -10,6 +10,7 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -122,7 +123,28 @@ fun SeaThermoWebView(
         }
     }
 
-    // ── 5. AndroidView로 Compose에 통합 ──────────────────────────
+    // ── 5. 시스템 뒤로가기 처리 ──────────────────────────────────
+    // [개념] BackHandler는 시스템 뒤로가기(제스처/버튼)를 가로채는 Composable API입니다.
+    //        NavHost 기본 BackHandler보다 더 가까운(inner) 스코프에 등록되므로 우선 실행됩니다.
+    //
+    // 처리 전략:
+    //   - WebView 내부에 방문 히스토리가 있으면 → webView.goBack()으로 웹 내 뒤로가기
+    //   - 히스토리가 없으면(첫 페이지) → onNavigateBack() 호출로 화면 닫기
+    //
+    // 이 처리 없이 NavHost에 위임하면, 사용자가 뒤로가기를 빠르게 2번 누를 때
+    // popBackStack()이 중복 호출되어 webview 화면뿐 아니라 부모(설정 화면)까지 닫히는
+    // 버그가 발생합니다. iOS의 navigationBarBackButtonHidden + 커스텀 dismiss에 대응합니다.
+    BackHandler(enabled = true) {
+        if (webView.canGoBack()) {
+            // 웹 내부 히스토리가 남아 있으면 WebView 안에서 뒤로 이동합니다.
+            webView.goBack()
+        } else {
+            // 더 이상 돌아갈 웹 히스토리가 없으면 Compose 화면을 닫습니다.
+            onNavigateBack()
+        }
+    }
+
+    // ── 6. AndroidView로 Compose에 통합 ──────────────────────────
     // [개념] statusBarsPadding()은 상태바 높이만큼 top padding을 자동으로 추가합니다.
     //        iOS의 NavigationStack safe area 처리와 동일한 효과입니다.
     //        navigationBarsPadding()은 하단 제스처바 영역과의 겹침을 방지합니다.

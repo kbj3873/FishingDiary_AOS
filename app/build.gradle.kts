@@ -33,7 +33,7 @@ android {
 
         // BuildConfig에 API 키 추가
         buildConfigField("String", "RISA_API_KEY", "\"${localProperties.getProperty("RISA_API_KEY", "")}\"")
-        buildConfigField("String", "API_BASE_URL", "\"${localProperties.getProperty("API_BASE_URL", "")}\"")
+        buildConfigField("String", "API_BASE_URL", "\"${localProperties.getProperty("API_BASE_URL", "https://seathermo.com")}\"")
         buildConfigField("String", "ONBADA_BASE_URL", "\"${localProperties.getProperty("ONBADA_BASE_URL", "")}\"")
         // Map API Keys
         buildConfigField("String", "GOOGLE_MAPS_KEY", "\"${localProperties.getProperty("GOOGLE_MAPS_KEY", "")}\"")

@@ -20,6 +20,10 @@
     <!-- Notification permission (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- 광고 미사용으로 Firebase 등 라이브러리가 자동 추가하는 AD_ID 권한을 제거합니다. -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID"
+        tools:node="remove" />
+
     <application
         android:name=".FDApplication"
         android:allowBackup="true"

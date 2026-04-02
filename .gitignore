@@ -25,3 +25,6 @@ GEMINI.md
 .idea/deploymentTargetSelector.xml
 .idea/deviceManager.xml
 .idea/inspectionProfiles/
+
+# 릴리즈 빌드 산출물 (APK, AAB)
+app/release/

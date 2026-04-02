@@ -271,10 +271,7 @@ fun FishingRecordScreen(
             } else {
                 pendingStartRecording = true
                 locationPermissionLauncher.launch(
-                    arrayOf(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
-                    )
+                    LocationPermissionHelper.getPermissionsToRequest(context)
                 )
             }
         }
@@ -287,14 +284,11 @@ fun FishingRecordScreen(
     //        pendingStartRecording = false: 권한 허용 후 기록을 자동 시작하지 않습니다.
     LaunchedEffect(Unit) {
         viewModel.startMonitoring()
-        if (!LocationPermissionHelper.hasLocationPermission(context)) {
+        // 위치 또는 알림(Android 13+) 권한 중 하나라도 없으면 한 번에 요청합니다.
+        val permissionsToRequest = LocationPermissionHelper.getPermissionsToRequest(context)
+        if (permissionsToRequest.isNotEmpty()) {
             pendingStartRecording = false
-            locationPermissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
-            )
+            locationPermissionLauncher.launch(permissionsToRequest)
         }
     }
 

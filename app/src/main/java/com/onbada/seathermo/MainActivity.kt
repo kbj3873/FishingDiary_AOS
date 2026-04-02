@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -61,7 +62,18 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            MaterialTheme {
+            // colorScheme.copy()로 background/surface만 흰색으로 재정의합니다.
+            // [개념] Material3 기본 background는 #FFFBFEff(라벤더빛 오프화이트)이며,
+            //        enableEdgeToEdge() 적용 시 투명해진 status bar 뒤로 이 색이 비쳐
+            //        보라빛 status bar처럼 보이는 현상이 발생합니다.
+            //        copy()로 해당 토큰만 덮어쓰면 전체 앱의 Surface/Scaffold 배경이
+            //        일괄적으로 흰색으로 적용됩니다.
+            MaterialTheme(
+                colorScheme = MaterialTheme.colorScheme.copy(
+                    background = Color.White,
+                    surface = Color.White
+                )
+            ) {
                 Surface(color = MaterialTheme.colorScheme.background) {
                     AppNavigation(diContainer = diContainer)
                 }

@@ -183,8 +183,8 @@ class LocationTrackingService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("낚시 일기")
-            .setContentText("위치 추적 중...")
+            .setContentTitle("온바다 - 낚시 기록 중")
+            .setContentText("현재 이동 경로를 안전하게 기록하고 있습니다.")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)

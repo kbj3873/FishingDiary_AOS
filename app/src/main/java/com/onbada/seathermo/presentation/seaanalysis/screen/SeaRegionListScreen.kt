@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -44,9 +43,9 @@ import com.onbada.seathermo.domain.entity.Region
 import com.onbada.seathermo.presentation.seaanalysis.viewmodel.SeaRegionListViewModel
 
 // ── 색상 상수 ──────────────────────────────────────────────────────────────────
-// Figma TemperatureRegionModal 기준
-private val SheetBackground = Color.White
-private val RowBackground = Color(0xFFF2F2F7)   // Figma: #F2F2F7
+// iOS 디자인 기준: 시트 배경 = #F2F2F7, 행 배경 = 흰색
+private val SheetBackground = Color(0xFFF2F2F7)
+private val RowBackground = Color.White
 private val AccentBlue = Color(0xFF2563EB)       // Figma: #2563EB (닫기 버튼)
 private val TitleColor = Color.Black
 private val SubtitleColor = Color(0xFF8E8E93)    // Figma: #8E8E93
@@ -89,7 +88,7 @@ fun SeaRegionListScreen(
     // [개념] ModalBottomSheet는 onDismissRequest로 외부 탭/스와이프 다운 시 닫힘을 처리합니다.
     //        dragHandle 파라미터로 기본 핸들을 교체하여 Figma 수치를 정확히 구현합니다.
     // Material3 1.3.x 변경: fillMaxHeight를 ModalBottomSheet modifier에 적용하면 시트가 상단 기준으로 배치됨.
-    // 대신 내부 Column에 화면 높이의 90%를 직접 지정하여 시트가 하단에서 올라오도록 합니다.
+    // 대신 내부 Column에 화면 높이의 80%를 직접 지정하여 현재수온 시트와 동일하게 하단에서 올라오도록 합니다.
     val screenHeight = LocalConfiguration.current.screenHeightDp.dp
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -116,7 +115,7 @@ fun SeaRegionListScreen(
     ) {
         Column(modifier = Modifier
             .fillMaxWidth()
-            .height(screenHeight * 0.9f)
+            .height(screenHeight * 0.8f)
         ) {
 
             // ── 헤더 ──────────────────────────────────────────────────────────

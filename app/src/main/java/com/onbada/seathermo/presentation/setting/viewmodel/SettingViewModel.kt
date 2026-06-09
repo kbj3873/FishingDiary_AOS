@@ -99,7 +99,7 @@ class SettingViewModel(
  *        지도 타입 외에도 공지사항, 약관 등 메뉴 구성을 여기서 관리할 수 있습니다.
  */
 data class SettingUiState(
-    val selectedMapType: MapType = MapType.KAKAO_MAP,
+    val selectedMapType: MapType = MapType.GOOGLE_MAP,
     // 낚시 기록 중 지도 변경 시도 시 표시할 차단 팝업 플래그
     val showRecordingBlockedDialog: Boolean = false,
     val appVersion: String = "1.0.0", // TODO: BuildConfig에서 가져오도록 수정

@@ -163,9 +163,39 @@ class HistoryDetailViewModel(
             polylines = polylines,
             photoMarkers = photoMarkers,
             stateMarkers = stateMarkers,
+            startMarker = endpointMarkerFor(
+                record = first,
+                id = "history_start_marker",
+                title = "낚시 시작",
+                timeString = timeSdf.format(Date(first.date))
+            ),
+            endMarker = endpointMarkerFor(
+                record = last,
+                id = "history_end_marker",
+                title = "낚시종료",
+                timeString = timeSdf.format(Date(last.date))
+            ),
             centerLatitude = first.location.latitude,
             centerLongitude = first.location.longitude
         )}
+    }
+
+    private fun endpointMarkerFor(
+        record: FishingRecord,
+        id: String,
+        title: String,
+        timeString: String
+    ): HistoryEndpointMarker? {
+        val latitude = record.location.latitude
+        val longitude = record.location.longitude
+        if (latitude == 0.0 && longitude == 0.0) return null
+        return HistoryEndpointMarker(
+            id = id,
+            title = title,
+            timeString = timeString,
+            latitude = latitude,
+            longitude = longitude
+        )
     }
 
     private fun calculateDistance(records: List<FishingRecord>): Double {
@@ -196,6 +226,21 @@ class HistoryDetailViewModel(
      */
     fun selectMarker(markerId: String) {
         val uiState = _uiState.value
+
+        // 시작/종료 마커 검색 — 상태 마커와 같은 하단 카드 구조를 재사용합니다.
+        val endpointMarker = listOfNotNull(uiState.startMarker, uiState.endMarker)
+            .firstOrNull { it.id == markerId }
+        if (endpointMarker != null) {
+            _uiState.update { it.copy(
+                selectedMarker = SelectedMarkerInfo(
+                    title = endpointMarker.title,
+                    timeString = endpointMarker.timeString,
+                    thumbnailPath = null,
+                    state = null
+                )
+            )}
+            return
+        }
 
         // 사진 마커 우선 검색
         val photoMarker = uiState.photoMarkers.firstOrNull { it.id == markerId }
@@ -318,6 +363,8 @@ data class HistoryDetailUiState(
     val polylines: List<HistoryPolyline> = emptyList(),
     val photoMarkers: List<HistoryPhotoMarker> = emptyList(),
     val stateMarkers: List<HistoryStateMarker> = emptyList(),
+    val startMarker: HistoryEndpointMarker? = null,
+    val endMarker: HistoryEndpointMarker? = null,
     val centerLatitude: Double = 37.5665,
     val centerLongitude: Double = 126.9780,
     val shouldDismiss: Boolean = false,
@@ -359,6 +406,14 @@ data class HistoryStateMarker(
     val latitude: Double,
     val longitude: Double,
     val state: FDAppManager.FishingState
+)
+
+data class HistoryEndpointMarker(
+    val id: String,
+    val title: String,
+    val timeString: String,
+    val latitude: Double,
+    val longitude: Double
 )
 
 data class HistoryPhotoMarker(

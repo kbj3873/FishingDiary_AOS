@@ -1,3 +1,4 @@
+import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
 import java.util.Properties
 
 plugins {
@@ -9,8 +10,21 @@ plugins {
     id("com.google.firebase.crashlytics")
 }
 
+googleServices {
+    missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN
+}
+
 android {
     namespace = "com.onbada.seathermo"
+    val localProperties = Properties()
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { localProperties.load(it) }
+    }
+    val kakaoAppKey = localProperties.getProperty("KAKAO_APP_KEY", "")
+    val kakaoAppKeyPublic = localProperties.getProperty("KAKAO_APP_KEY_PUBLIC", kakaoAppKey)
+    val kakaoAppKeyInternal = localProperties.getProperty("KAKAO_APP_KEY_INTERNAL", kakaoAppKey)
+
     compileSdk {
         version = release(36)
     }
@@ -19,17 +33,10 @@ android {
         applicationId = "com.onbada.seathermo"
         minSdk = 24
         targetSdk = 36
-        versionCode = 4
+        versionCode = 5
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        // local.properties에서 API 키 읽어오기
-        val localProperties = Properties()
-        val localPropertiesFile = rootProject.file("local.properties")
-        if (localPropertiesFile.exists()) {
-            localPropertiesFile.inputStream().use { localProperties.load(it) }
-        }
 
         // BuildConfig에 API 키 추가
         buildConfigField("String", "RISA_API_KEY", "\"${localProperties.getProperty("RISA_API_KEY", "")}\"")
@@ -37,11 +44,38 @@ android {
         buildConfigField("String", "ONBADA_BASE_URL", "\"${localProperties.getProperty("ONBADA_BASE_URL", "")}\"")
         // Map API Keys
         buildConfigField("String", "GOOGLE_MAPS_KEY", "\"${localProperties.getProperty("GOOGLE_MAPS_KEY", "")}\"")
-        buildConfigField("String", "KAKAO_APP_KEY", "\"${localProperties.getProperty("KAKAO_APP_KEY", "")}\"")
 
         // Manifest에서 사용할 수 있도록 변수 주입
         manifestPlaceholders["GOOGLE_MAPS_KEY"] = localProperties.getProperty("GOOGLE_MAPS_KEY", "")
-        manifestPlaceholders["KAKAO_APP_KEY"] = localProperties.getProperty("KAKAO_APP_KEY", "")
+
+        // Kakao Maps SDK는 ARM 아키텍처 전용 네이티브 라이브러리(.so)만 제공합니다.
+        // x86_64 에뮬레이터에서 실행 시 UnsatisfiedLinkError(ABI 불일치)가 발생하므로
+        // ARM 아키텍처만 허용합니다. 실제 Android 기기는 모두 ARM 기반입니다.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
+    }
+
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("public") {
+            dimension = "distribution"
+            applicationId = "com.onbada.seathermo"
+            buildConfigField("boolean", "INTERNAL_BUILD", "false")
+            buildConfigField("String", "BUILD_DISTRIBUTION", "\"public\"")
+            buildConfigField("String", "KAKAO_APP_KEY", "\"$kakaoAppKeyPublic\"")
+            manifestPlaceholders["KAKAO_APP_KEY"] = kakaoAppKeyPublic
+        }
+
+        create("internal") {
+            dimension = "distribution"
+            applicationId = "com.onbada.seathermo.internal"
+            versionNameSuffix = "-internal"
+            buildConfigField("boolean", "INTERNAL_BUILD", "true")
+            buildConfigField("String", "BUILD_DISTRIBUTION", "\"internal\"")
+            buildConfigField("String", "KAKAO_APP_KEY", "\"$kakaoAppKeyInternal\"")
+            manifestPlaceholders["KAKAO_APP_KEY"] = kakaoAppKeyInternal
+        }
     }
 
     buildTypes {

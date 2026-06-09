@@ -95,6 +95,8 @@ fun HistoryDetailScreen(
                 polylines     = uiState.polylines,
                 stateMarkers  = uiState.stateMarkers,
                 photoMarkers  = uiState.photoMarkers,
+                startMarker   = uiState.startMarker,
+                endMarker     = uiState.endMarker,
                 onMarkerClick = { markerId -> viewModel.selectMarker(markerId) },
                 modifier      = Modifier.fillMaxSize()
             )
@@ -102,6 +104,8 @@ fun HistoryDetailScreen(
                 polylines     = uiState.polylines,
                 stateMarkers  = uiState.stateMarkers,
                 photoMarkers  = uiState.photoMarkers,
+                startMarker   = uiState.startMarker,
+                endMarker     = uiState.endMarker,
                 onMarkerClick = { markerId -> viewModel.selectMarker(markerId) },
                 modifier      = Modifier.fillMaxSize()
             )

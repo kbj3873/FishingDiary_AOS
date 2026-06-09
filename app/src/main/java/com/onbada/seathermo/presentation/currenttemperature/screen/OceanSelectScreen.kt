@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
@@ -45,9 +45,9 @@ import com.onbada.seathermo.domain.entity.CombinedCurrentTemperature
 import com.onbada.seathermo.presentation.currenttemperature.viewmodel.OceanSelectViewModel
 
 // ── 색상 상수 ────────────────────────────────────────────────────────────────
-// Figma 기준: 시트 배경 = 흰색, 셀 배경 = #F2F2F7
-private val SheetBackground = Color.White
-private val CardBackground = Color(0xFFF2F2F7)
+// iOS 디자인 기준: 시트 배경 = #F2F2F7, 셀 배경 = 흰색
+private val SheetBackground = Color(0xFFF2F2F7)
+private val CardBackground = Color.White
 private val AccentBlue = Color(0xFF2563EB)
 private val TextBlack = Color.Black
 private val TextGray = Color(0xFF8E8E93)
@@ -78,6 +78,7 @@ fun OceanSelectScreen(
 
     val oceanStations by viewModel.oceanStations.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
 
     // [개념] DisposableEffect는 Composable이 화면을 떠날 때(onDispose) 정리 작업을 실행합니다.
     //        iOS의 .onDisappear { viewModel.viewDidDisappear() }에 대응합니다.
@@ -95,7 +96,6 @@ fun OceanSelectScreen(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        modifier = Modifier.fillMaxHeight(0.8f),
         containerColor = SheetBackground,
         tonalElevation = 0.dp,
         dragHandle = {
@@ -116,7 +116,11 @@ fun OceanSelectScreen(
             }
         }
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(screenHeight * 0.8f)
+        ) {
 
             // ── 헤더 ──────────────────────────────────────────────────────
             HeaderSection(onDismiss = onDismiss)

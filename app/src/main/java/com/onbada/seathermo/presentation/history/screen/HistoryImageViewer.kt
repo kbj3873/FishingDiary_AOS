@@ -6,9 +6,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -33,6 +34,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -97,6 +99,7 @@ private fun HistoryImageViewerContent(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current
     // [개념] rememberCoroutineScope()는 Composable 생명주기에 묶인 코루틴 스코프를 제공합니다.
     //        animateScrollToPage()가 suspend 함수이므로 코루틴 안에서 호출해야 합니다.
     //        iOS의 withAnimation { } 블록에 대응합니다.
@@ -110,6 +113,14 @@ private fun HistoryImageViewerContent(
     )
 
     var showDeletePopup by remember { mutableStateOf(false) }
+    val navigationBarBottomPadding = with(density) {
+        WindowInsets.navigationBars.getBottom(this).toDp()
+    }
+    val bottomControlsPadding = if (navigationBarBottomPadding > 0.dp) {
+        navigationBarBottomPadding + 24.dp
+    } else {
+        72.dp
+    }
 
     // 페이지 스와이프 시 ViewModel 인덱스 동기화
     // [개념] snapshotFlow는 Compose 상태 변화를 Flow로 변환합니다.
@@ -195,8 +206,7 @@ private fun HistoryImageViewerContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(bottom = 32.dp),
+                    .padding(bottom = bottomControlsPadding),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment     = Alignment.CenterVertically
             ) {

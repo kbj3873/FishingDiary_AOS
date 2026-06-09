@@ -29,12 +29,16 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.onbada.seathermo.BuildConfig
 import com.onbada.seathermo.R
 import com.onbada.seathermo.application.di.ApplicationDIContainer
 import com.onbada.seathermo.presentation.currenttemperature.screen.CrawlingCurrentTemperatureScreen
+import com.onbada.seathermo.presentation.currenttemperature.screen.CurrentTemperatureScreen
 import com.onbada.seathermo.presentation.currenttemperature.viewmodel.CrawlingCurrentTemperatureViewModel
+import com.onbada.seathermo.presentation.currenttemperature.viewmodel.CurrentTemperatureViewModel
 import com.onbada.seathermo.presentation.fishingrecord.screen.FishingRecordScreen
 import com.onbada.seathermo.presentation.fishingrecord.viewmodel.FishingRecordViewModel
+import com.onbada.seathermo.presentation.seaanalysis.screen.PublicSeaAnalysisPreparingScreen
 import com.onbada.seathermo.presentation.seaanalysis.screen.SeaAnalysisTabNavHost
 import com.onbada.seathermo.infrastructure.webview.WebPage
 import com.onbada.seathermo.presentation.history.screen.HistoryTabNavHost
@@ -183,17 +187,31 @@ fun MainTabScreen(
                     //        Composable이 Composition에 남아 있는 한 동일 인스턴스가 재사용됩니다.
                     when (item) {
                         TabItem.CurrentTemperature -> {
-                            val crawlingViewModel: CrawlingCurrentTemperatureViewModel = viewModel(
-                                factory = diContainer.makeCrawlingCurrentTemperatureViewModelFactory()
-                            )
-                            CrawlingCurrentTemperatureScreen(
-                                viewModel = crawlingViewModel,
-                                diContainer = diContainer
-                            )
+                            if (BuildConfig.INTERNAL_BUILD) {
+                                val crawlingViewModel: CrawlingCurrentTemperatureViewModel = viewModel(
+                                    factory = diContainer.makeCrawlingCurrentTemperatureViewModelFactory()
+                                )
+                                CrawlingCurrentTemperatureScreen(
+                                    viewModel = crawlingViewModel,
+                                    diContainer = diContainer
+                                )
+                            } else {
+                                val currentTemperatureViewModel: CurrentTemperatureViewModel = viewModel(
+                                    factory = diContainer.makeCurrentTemperatureViewModelFactory()
+                                )
+                                CurrentTemperatureScreen(
+                                    viewModel = currentTemperatureViewModel,
+                                    diContainer = diContainer
+                                )
+                            }
                         }
-                        TabItem.Analysis -> SeaAnalysisTabNavHost(
-                            diContainer = diContainer
-                        )
+                        TabItem.Analysis -> {
+                            if (BuildConfig.INTERNAL_BUILD) {
+                                SeaAnalysisTabNavHost(diContainer = diContainer)
+                            } else {
+                                PublicSeaAnalysisPreparingScreen()
+                            }
+                        }
                         TabItem.FishingRecord -> {
                             val fishingRecordViewModel: FishingRecordViewModel = viewModel(
                                 factory = diContainer.makeFishingRecordViewModelFactory()

@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.location.Location
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -62,6 +63,7 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.PolylineOptions
 import com.kakao.vectormap.KakaoMap
@@ -137,6 +139,7 @@ fun FishingRecordScreen(
     var kakaoPolyLayer by remember { mutableStateOf<ShapeLayer?>(null) }
     var kakaoStateLabelLayer by remember { mutableStateOf<LabelLayer?>(null) }
     var kakaoPhotoLabelLayer by remember { mutableStateOf<LabelLayer?>(null) }
+    var kakaoEndpointLabelLayer by remember { mutableStateOf<LabelLayer?>(null) }
     // 현재 위치 마커 레이어 — Kakao Maps는 isMyLocationEnabled 없으므로 직접 관리합니다.
     var kakaoLocationLabelLayer by remember { mutableStateOf<LabelLayer?>(null) }
     // 현재 위치 마커 Label 참조 — 초기 표시(LaunchedEffect)와 GPS 이동(mapLineEvents) 양쪽에서 공유합니다.
@@ -230,6 +233,7 @@ fun FishingRecordScreen(
     var lastDrawnPhotoMarkerCount by remember { mutableIntStateOf(0) }
     // 이전 isRecording 값 추적 (녹화 중단 시점 감지용)
     var wasRecording by remember { mutableStateOf(false) }
+    var googleStartMarker by remember { mutableStateOf<Marker?>(null) }
 
     // 포그라운드 복귀 직후 버스트 구간 제어 플래그.
     // [개념] 백그라운드에서 쌓인 GPS 이벤트들이 포그라운드 복귀 시 한꺼번에 처리되면
@@ -501,6 +505,7 @@ fun FishingRecordScreen(
         if (wasRecording && !uiState.isRecording) {
             // Google 지도 초기화
             googleMap?.clear()
+            googleStartMarker = null
             // Kakao 레이어 초기화 후 재생성
             // [개념] ShapeLayer/LabelLayer에는 인자 없는 remove()가 없으므로 매니저를 통해 제거합니다.
             // 경로/마커 레이어만 초기화합니다. 위치 레이어는 기록 상태와 무관하게 유지합니다.
@@ -511,10 +516,12 @@ fun FishingRecordScreen(
                 kakaoPolyLayer?.let { m.getShapeManager()?.remove(it) }
                 kakaoStateLabelLayer?.let { m.getLabelManager()?.remove(it) }
                 kakaoPhotoLabelLayer?.let { m.getLabelManager()?.remove(it) }
+                kakaoEndpointLabelLayer?.let { m.getLabelManager()?.remove(it) }
             }
             kakaoPolyLayer = null
             kakaoStateLabelLayer = null
             kakaoPhotoLabelLayer = null
+            kakaoEndpointLabelLayer = null
             kakaoMap?.let { map ->
                 kakaoPolyLayer = map.getShapeManager()?.addLayer(
                     ShapeLayerOptions.from("record_poly_layer").setZOrder(9999)
@@ -525,6 +532,9 @@ fun FishingRecordScreen(
                 )
                 kakaoPhotoLabelLayer = labelMgr?.addLayer(
                     LabelLayerOptions.from("record_photo_layer").setZOrder(2)
+                )
+                kakaoEndpointLabelLayer = labelMgr?.addLayer(
+                    LabelLayerOptions.from("record_endpoint_layer").setZOrder(3)
                 )
             }
             lastDrawnMarkerCount = 0
@@ -538,14 +548,59 @@ fun FishingRecordScreen(
     //        낚시 기록 중에는 SettingViewModel에서 변경이 차단되므로 기록 데이터 손실이 없습니다.
     LaunchedEffect(currentMapType) {
         googleMap = null
+        googleStartMarker = null
         kakaoMap = null
         kakaoPolyLayer = null
         kakaoStateLabelLayer = null
         kakaoPhotoLabelLayer = null
+        kakaoEndpointLabelLayer = null
         kakaoLocationLabelLayer = null
         kakaoLocationLabel = null
         lastDrawnMarkerCount = 0
         lastDrawnPhotoMarkerCount = 0
+    }
+
+    // ── 시작 마커 표시 (Google) ───────────────────────────────────────────
+    // 낚시기록 화면에서는 시작 마커만 기록 중에 표시합니다. 종료 마커는 히스토리 상세에서만 표시합니다.
+    LaunchedEffect(googleMap, uiState.startLocation, uiState.isRecording) {
+        val map = googleMap ?: return@LaunchedEffect
+        if (!uiState.isRecording) {
+            googleStartMarker?.remove()
+            googleStartMarker = null
+            return@LaunchedEffect
+        }
+
+        googleStartMarker = syncGoogleEndpointMarker(
+            currentMarker = googleStartMarker,
+            map = map,
+            context = context,
+            location = uiState.startLocation,
+            iconResId = R.drawable.ic_map_marker_start
+        )
+    }
+
+    // ── 시작 마커 표시 (Kakao) ────────────────────────────────────────────
+    // Kakao Label은 개별 삭제보다 레이어 단위 재생성이 안정적이라 endpoint 전용 레이어만 갱신합니다.
+    LaunchedEffect(kakaoMap, uiState.startLocation, uiState.isRecording) {
+        val map = kakaoMap ?: return@LaunchedEffect
+        val labelMgr = map.getLabelManager() ?: return@LaunchedEffect
+
+        labelMgr.getLayer("record_endpoint_layer")?.let { labelMgr.remove(it) }
+        kakaoEndpointLabelLayer = null
+        if (!uiState.isRecording) return@LaunchedEffect
+
+        val endpointLayer = labelMgr.addLayer(
+            LabelLayerOptions.from("record_endpoint_layer").setZOrder(3)
+        ) ?: return@LaunchedEffect
+        kakaoEndpointLabelLayer = endpointLayer
+
+        addKakaoEndpointLabel(
+            context = context,
+            layer = endpointLayer,
+            location = uiState.startLocation,
+            iconResId = R.drawable.ic_map_marker_start,
+            labelId = "record_start_marker"
+        )
     }
 
     // ── Kakao 초기 카메라 이동 ─────────────────────────────────────────────
@@ -799,6 +854,9 @@ fun FishingRecordScreen(
                     )
                     kakaoPhotoLabelLayer = labelMgr?.addLayer(
                         LabelLayerOptions.from("record_photo_layer").setZOrder(2)
+                    )
+                    kakaoEndpointLabelLayer = labelMgr?.addLayer(
+                        LabelLayerOptions.from("record_endpoint_layer").setZOrder(3)
                     )
                     // 현재 위치 마커 레이어 — 모든 레이어 위에 표시합니다.
                     kakaoLocationLabelLayer = labelMgr?.addLayer(
@@ -1496,6 +1554,67 @@ private fun stateLineColor(fishingState: FDAppManager.FishingState): Color {
         FDAppManager.FishingState.DRIFTING -> StateDriftingColor
         FDAppManager.FishingState.FISHING -> StateFishingColor
     }
+}
+
+private suspend fun syncGoogleEndpointMarker(
+    currentMarker: Marker?,
+    map: GoogleMap,
+    context: Context,
+    location: Location?,
+    iconResId: Int
+): Marker? {
+    if (!isValidMapLocation(location)) {
+        currentMarker?.remove()
+        return null
+    }
+    val validLocation = location ?: return null
+
+    val position = LatLng(validLocation.latitude, validLocation.longitude)
+    currentMarker?.let { marker ->
+        marker.position = position
+        return marker
+    }
+
+    val bitmap = withContext(Dispatchers.IO) {
+        BitmapFactory.decodeResource(context.resources, iconResId)
+    }
+    return map.addMarker(
+        MarkerOptions()
+            .position(position)
+            .icon(BitmapDescriptorFactory.fromBitmap(bitmap))
+            .anchor(0.5f, 0.5f)
+    )
+}
+
+private suspend fun addKakaoEndpointLabel(
+    context: Context,
+    layer: LabelLayer,
+    location: Location?,
+    iconResId: Int,
+    labelId: String
+) {
+    if (!isValidMapLocation(location)) return
+    val validLocation = location ?: return
+
+    val bitmap = withContext(Dispatchers.IO) {
+        loadKakaoEndpointMarkerBitmap(context, iconResId)
+    }
+    layer.addLabel(
+        LabelOptions.from(labelId, KakaoLatLng.from(validLocation.latitude, validLocation.longitude))
+            .setStyles(LabelStyle.from(bitmap).setAnchorPoint(0.5f, 0.5f))
+    )
+}
+
+private fun isValidMapLocation(location: Location?): Boolean {
+    return location != null && (location.latitude != 0.0 || location.longitude != 0.0)
+}
+
+private fun loadKakaoEndpointMarkerBitmap(context: Context, iconResId: Int): Bitmap {
+    val bitmap = BitmapFactory.decodeResource(context.resources, iconResId)
+    val density = context.resources.displayMetrics.density
+    val width = (bitmap.width / density * 2).toInt().coerceAtLeast(1)
+    val height = (bitmap.height / density * 2).toInt().coerceAtLeast(1)
+    return Bitmap.createScaledBitmap(bitmap, width, height, true)
 }
 
 /**

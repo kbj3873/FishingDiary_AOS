@@ -47,10 +47,9 @@ import com.onbada.seathermo.presentation.common.components.CommonPopupView
 import com.onbada.seathermo.presentation.currenttemperature.viewmodel.CrawlingOceanSelectViewModel
 
 // ── 색상 상수 ────────────────────────────────────────────────────────────────
-// Figma 기준: 시트 배경 = 흰색, 셀 배경 = #F2F2F7 (연한 그레이)
-// iOS 코드(.background(F2F2F7) on sheet, .background(white) on cell)는 Figma와 반대로 구현되어 있었음
-private val SheetBackground = Color.White
-private val CardBackground = Color(0xFFF2F2F7)
+// iOS 디자인 기준: 시트 배경 = #F2F2F7, 셀 배경 = 흰색
+private val SheetBackground = Color(0xFFF2F2F7)
+private val CardBackground = Color.White
 private val AccentBlue = Color(0xFF2563EB)
 private val TextBlack = Color.Black
 private val TextGray = Color(0xFF8E8E93)

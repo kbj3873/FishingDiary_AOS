@@ -34,6 +34,7 @@ import com.kakao.vectormap.shape.ShapeLayerOptions
 import com.onbada.seathermo.R
 import com.onbada.seathermo.managers.FDAppManager
 import com.onbada.seathermo.presentation.history.viewmodel.GeoCoord
+import com.onbada.seathermo.presentation.history.viewmodel.HistoryEndpointMarker
 import com.onbada.seathermo.presentation.history.viewmodel.HistoryPhotoMarker
 import com.onbada.seathermo.presentation.history.viewmodel.HistoryPolyline
 import com.onbada.seathermo.presentation.history.viewmodel.HistoryStateMarker
@@ -61,6 +62,8 @@ fun KakaoHistoryMapView(
     polylines: List<HistoryPolyline>,
     stateMarkers: List<HistoryStateMarker>,
     photoMarkers: List<HistoryPhotoMarker>,
+    startMarker: HistoryEndpointMarker? = null,
+    endMarker: HistoryEndpointMarker? = null,
     onMarkerClick: (markerId: String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -103,6 +106,7 @@ fun KakaoHistoryMapView(
                 sm?.getLayer("history_poly_layer")?.let { sm.remove(it) }
                 lm?.getLayer("history_state_layer")?.let { lm.remove(it) }
                 lm?.getLayer("history_photo_layer")?.let { lm.remove(it) }
+                lm?.getLayer("history_endpoint_layer")?.let { lm.remove(it) }
             }
             mapView.pause()
         }
@@ -114,9 +118,14 @@ fun KakaoHistoryMapView(
     //        kakaoMap 없이 데이터 크기만 key로 사용하면:
     //          1) LaunchedEffect 첫 실행 시 kakaoMap == null → return
     //          2) 이후 onMapReady가 와도 LaunchedEffect가 재실행되지 않음 → 영구적으로 빈 지도
-    LaunchedEffect(kakaoMap, polylines.size, stateMarkers.size, photoMarkers.size) {
+    LaunchedEffect(kakaoMap, polylines.size, stateMarkers.size, photoMarkers.size, startMarker, endMarker) {
         val map = kakaoMap ?: return@LaunchedEffect
-        if (polylines.isEmpty() && stateMarkers.isEmpty() && photoMarkers.isEmpty()) return@LaunchedEffect
+        if (polylines.isEmpty() &&
+            stateMarkers.isEmpty() &&
+            photoMarkers.isEmpty() &&
+            startMarker == null &&
+            endMarker == null
+        ) return@LaunchedEffect
 
         drawKakaoHistoryMap(
             kakaoMap = map,
@@ -124,6 +133,8 @@ fun KakaoHistoryMapView(
             polylines = polylines,
             stateMarkers = stateMarkers,
             photoMarkers = photoMarkers,
+            startMarker = startMarker,
+            endMarker = endMarker,
             onMarkerClick = onMarkerClick
         )
         // 카메라 이동은 지도 렌더링 완료 후 실행합니다.
@@ -131,7 +142,7 @@ fun KakaoHistoryMapView(
         //        Google의 setOnMapLoadedCallback 패턴과 동일한 역할입니다.
         //        렌더링 전에 moveCamera를 호출하면 카카오 본사(기본 위치)에 고정되는 버그가 발생합니다.
         mapView.post {
-            kakaoZoomToFit(map, polylines, stateMarkers, photoMarkers)
+            kakaoZoomToFit(map, polylines, stateMarkers, photoMarkers, startMarker, endMarker)
         }
     }
 
@@ -172,6 +183,8 @@ private fun drawKakaoHistoryMap(
     polylines: List<HistoryPolyline>,
     stateMarkers: List<HistoryStateMarker>,
     photoMarkers: List<HistoryPhotoMarker>,
+    startMarker: HistoryEndpointMarker?,
+    endMarker: HistoryEndpointMarker?,
     onMarkerClick: (markerId: String) -> Unit
 ) {
     val shapeManager = kakaoMap.getShapeManager() ?: return
@@ -183,6 +196,7 @@ private fun drawKakaoHistoryMap(
     shapeManager.getLayer("history_poly_layer")?.let { shapeManager.remove(it) }
     labelManager.getLayer("history_state_layer")?.let { labelManager.remove(it) }
     labelManager.getLayer("history_photo_layer")?.let { labelManager.remove(it) }
+    labelManager.getLayer("history_endpoint_layer")?.let { labelManager.remove(it) }
 
     // ── 1. 폴리라인 레이어 생성 및 그리기 ─────────────────────────────────
     // iOS의 HistoryPolylineLayer (zOrder: 10000)에 대응합니다.
@@ -203,7 +217,26 @@ private fun drawKakaoHistoryMap(
         )
     }
 
-    // ── 2. 상태 마커 레이어 생성 및 그리기 ────────────────────────────────
+    // ── 2. 시작/종료 마커 레이어 생성 및 그리기 ──────────────────────────
+    val endpointLayer: LabelLayer = labelManager.addLayer(
+        LabelLayerOptions.from("history_endpoint_layer").setZOrder(14000)
+    ) ?: return
+    addKakaoHistoryEndpointLabel(
+        context = context,
+        layer = endpointLayer,
+        marker = startMarker,
+        iconResId = R.drawable.ic_map_marker_start,
+        labelId = "history_start_marker"
+    )
+    addKakaoHistoryEndpointLabel(
+        context = context,
+        layer = endpointLayer,
+        marker = endMarker,
+        iconResId = R.drawable.ic_map_marker_end,
+        labelId = "history_end_marker"
+    )
+
+    // ── 3. 상태 마커 레이어 생성 및 그리기 ────────────────────────────────
     // iOS의 HistoryStateLayer (zOrder: 15000)에 대응합니다.
     val stateLayer: LabelLayer = labelManager.addLayer(
         LabelLayerOptions.from("history_state_layer").setZOrder(15000)
@@ -232,7 +265,7 @@ private fun drawKakaoHistoryMap(
         stateLayer.addLabel(labelOptions)
     }
 
-    // ── 3. 사진 마커 레이어 생성 및 그리기 ────────────────────────────────
+    // ── 4. 사진 마커 레이어 생성 및 그리기 ────────────────────────────────
     // iOS의 HistoryPhotoLayer (zOrder: 20000)에 대응합니다.
     val photoLayer: LabelLayer = labelManager.addLayer(
         LabelLayerOptions.from("history_photo_layer").setZOrder(20000)
@@ -268,12 +301,16 @@ private fun kakaoZoomToFit(
     kakaoMap: KakaoMap,
     polylines: List<HistoryPolyline>,
     stateMarkers: List<HistoryStateMarker>,
-    photoMarkers: List<HistoryPhotoMarker>
+    photoMarkers: List<HistoryPhotoMarker>,
+    startMarker: HistoryEndpointMarker?,
+    endMarker: HistoryEndpointMarker?
 ) {
     val allCoords = mutableListOf<GeoCoord>()
     polylines.forEach { allCoords.addAll(it.coordinates) }
     stateMarkers.forEach { allCoords.add(GeoCoord(it.latitude, it.longitude)) }
     photoMarkers.forEach { allCoords.add(GeoCoord(it.latitude, it.longitude)) }
+    startMarker?.let { allCoords.add(GeoCoord(it.latitude, it.longitude)) }
+    endMarker?.let { allCoords.add(GeoCoord(it.latitude, it.longitude)) }
 
     if (allCoords.isEmpty()) return
 
@@ -333,6 +370,33 @@ private fun kakaoHistoryPolylineColor(state: Int): Color = when (state) {
     0    -> KakaoHistoryMovingColor
     1    -> KakaoHistoryDriftingColor
     else -> KakaoHistoryFishingColor
+}
+
+private fun addKakaoHistoryEndpointLabel(
+    context: android.content.Context,
+    layer: LabelLayer,
+    marker: HistoryEndpointMarker?,
+    iconResId: Int,
+    labelId: String
+) {
+    marker ?: return
+
+    val bitmap = loadKakaoHistoryEndpointMarkerBitmap(context, iconResId)
+    val labelOptions = LabelOptions.from(labelId, KakaoLatLng.from(marker.latitude, marker.longitude))
+        .setStyles(LabelStyle.from(bitmap).setAnchorPoint(0.5f, 0.5f))
+        .setTag(marker.id)
+    layer.addLabel(labelOptions)
+}
+
+private fun loadKakaoHistoryEndpointMarkerBitmap(
+    context: android.content.Context,
+    iconResId: Int
+): android.graphics.Bitmap {
+    val bitmap = BitmapFactory.decodeResource(context.resources, iconResId)
+    val density = context.resources.displayMetrics.density
+    val width = (bitmap.width / density * 2).toInt().coerceAtLeast(1)
+    val height = (bitmap.height / density * 2).toInt().coerceAtLeast(1)
+    return android.graphics.Bitmap.createScaledBitmap(bitmap, width, height, true)
 }
 
 /**

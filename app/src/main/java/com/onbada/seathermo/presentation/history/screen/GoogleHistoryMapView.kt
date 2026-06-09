@@ -30,6 +30,7 @@ import com.google.android.gms.maps.model.PolylineOptions
 import com.onbada.seathermo.R
 import com.onbada.seathermo.managers.FDAppManager
 import com.onbada.seathermo.presentation.history.viewmodel.GeoCoord
+import com.onbada.seathermo.presentation.history.viewmodel.HistoryEndpointMarker
 import com.onbada.seathermo.presentation.history.viewmodel.HistoryPhotoMarker
 import com.onbada.seathermo.presentation.history.viewmodel.HistoryPolyline
 import com.onbada.seathermo.presentation.history.viewmodel.HistoryStateMarker
@@ -59,6 +60,8 @@ fun GoogleHistoryMapView(
     polylines: List<HistoryPolyline>,
     stateMarkers: List<HistoryStateMarker>,
     photoMarkers: List<HistoryPhotoMarker>,
+    startMarker: HistoryEndpointMarker? = null,
+    endMarker: HistoryEndpointMarker? = null,
     onMarkerClick: (markerId: String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -99,7 +102,7 @@ fun GoogleHistoryMapView(
     // 지도 준비 후 데이터를 한 번에 렌더링합니다.
     // [개념] LaunchedEffect의 key에 polylines.size를 사용하면 데이터 로드 완료 시 재실행됩니다.
     //        초기에 빈 리스트로 진입했다가 fetchSessionData() 완료 후 데이터가 채워지는 흐름입니다.
-    LaunchedEffect(polylines.size, stateMarkers.size, photoMarkers.size) {
+    LaunchedEffect(polylines.size, stateMarkers.size, photoMarkers.size, startMarker, endMarker) {
         mapView.getMapAsync { googleMap ->
             // 지도 UI 설정
             googleMap.uiSettings.apply {
@@ -118,14 +121,19 @@ fun GoogleHistoryMapView(
             }
 
             // 데이터가 있을 때만 지도를 채웁니다.
-            if (polylines.isNotEmpty() || stateMarkers.isNotEmpty() || photoMarkers.isNotEmpty()) {
-                drawHistoryMap(googleMap, context, polylines, stateMarkers, photoMarkers)
+            if (polylines.isNotEmpty() ||
+                stateMarkers.isNotEmpty() ||
+                photoMarkers.isNotEmpty() ||
+                startMarker != null ||
+                endMarker != null
+            ) {
+                drawHistoryMap(googleMap, context, polylines, stateMarkers, photoMarkers, startMarker, endMarker)
                 // [개념] setOnMapLoadedCallback은 지도 타일과 View 레이아웃이 모두 완료된 후 1회 실행됩니다.
                 //        mapView.post보다 확실하게 완료 시점을 보장합니다.
                 //        newLatLngBounds는 MapView의 실제 크기(width/height)를 알아야 동작하므로
                 //        레이아웃 완료 전 호출하면 IllegalStateException이 발생해 고정 줌으로 폴백됩니다.
                 googleMap.setOnMapLoadedCallback {
-                    zoomToFit(googleMap, polylines, stateMarkers, photoMarkers)
+                    zoomToFit(googleMap, polylines, stateMarkers, photoMarkers, startMarker, endMarker)
                 }
             }
         }
@@ -148,7 +156,9 @@ private fun drawHistoryMap(
     context: Context,
     polylines: List<HistoryPolyline>,
     stateMarkers: List<HistoryStateMarker>,
-    photoMarkers: List<HistoryPhotoMarker>
+    photoMarkers: List<HistoryPhotoMarker>,
+    startMarker: HistoryEndpointMarker?,
+    endMarker: HistoryEndpointMarker?
 ) {
     googleMap.clear()
 
@@ -165,7 +175,11 @@ private fun drawHistoryMap(
         )
     }
 
-    // 2. 상태 마커 (ic_map_marker_blue/orange/red)
+    // 2. 시작/종료 마커
+    addEndpointMarker(googleMap, context, startMarker, R.drawable.ic_map_marker_start)
+    addEndpointMarker(googleMap, context, endMarker, R.drawable.ic_map_marker_end)
+
+    // 3. 상태 마커 (ic_map_marker_blue/orange/red)
     for (marker in stateMarkers) {
         val iconResId = when (marker.state) {
             FDAppManager.FishingState.MOVING   -> R.drawable.ic_map_marker_blue
@@ -181,7 +195,7 @@ private fun drawHistoryMap(
         )?.also { it.tag = marker.id }  // id를 tag에 저장 → 클릭 시 식별
     }
 
-    // 3. 사진 마커 (초록 테두리 썸네일)
+    // 4. 사진 마커 (초록 테두리 썸네일)
     for (marker in photoMarkers) {
         val thumbnailBitmap = loadHistoryPhotoMarkerBitmap(context, marker.thumbnailPath)
         val icon = thumbnailBitmap?.let { BitmapDescriptorFactory.fromBitmap(it) }
@@ -203,12 +217,16 @@ private fun zoomToFit(
     googleMap: GoogleMap,
     polylines: List<HistoryPolyline>,
     stateMarkers: List<HistoryStateMarker>,
-    photoMarkers: List<HistoryPhotoMarker>
+    photoMarkers: List<HistoryPhotoMarker>,
+    startMarker: HistoryEndpointMarker?,
+    endMarker: HistoryEndpointMarker?
 ) {
     val allCoords = mutableListOf<GeoCoord>()
     polylines.forEach { allCoords.addAll(it.coordinates) }
     stateMarkers.forEach { allCoords.add(GeoCoord(it.latitude, it.longitude)) }
     photoMarkers.forEach { allCoords.add(GeoCoord(it.latitude, it.longitude)) }
+    startMarker?.let { allCoords.add(GeoCoord(it.latitude, it.longitude)) }
+    endMarker?.let { allCoords.add(GeoCoord(it.latitude, it.longitude)) }
 
     if (allCoords.isEmpty()) return
 
@@ -252,6 +270,22 @@ private fun polylineColor(state: Int): Color = when (state) {
     0    -> StateMovingColor
     1    -> StateDriftingColor
     else -> StateFishingColor
+}
+
+private fun addEndpointMarker(
+    googleMap: GoogleMap,
+    context: Context,
+    marker: HistoryEndpointMarker?,
+    iconResId: Int
+) {
+    marker ?: return
+    val bitmap = BitmapFactory.decodeResource(context.resources, iconResId)
+    googleMap.addMarker(
+        MarkerOptions()
+            .position(LatLng(marker.latitude, marker.longitude))
+            .icon(BitmapDescriptorFactory.fromBitmap(bitmap))
+            .anchor(0.5f, 0.5f)
+    )?.also { it.tag = marker.id }
 }
 
 /**

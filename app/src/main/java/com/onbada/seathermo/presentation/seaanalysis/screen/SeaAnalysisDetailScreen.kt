@@ -3,9 +3,11 @@ package com.onbada.seathermo.presentation.seaanalysis.screen
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
@@ -23,12 +25,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +55,7 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -257,6 +266,7 @@ private fun HeaderSection(stationName: String) {
  */
 @Composable
 private fun GraphSection(uiState: SeaAnalysisDetailUiState) {
+    var selectedScale by remember { mutableStateOf(TemperatureGraphScale.DATE) }
     val graphDataSets = remember(uiState.surfaceValues, uiState.middleValues, uiState.bottomValues) {
         buildList {
             if (uiState.surfaceValues.isNotEmpty()) add(GraphDataSet(uiState.surfaceValues, SurfaceColor))
@@ -265,7 +275,7 @@ private fun GraphSection(uiState: SeaAnalysisDetailUiState) {
         }
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
@@ -278,41 +288,55 @@ private fun GraphSection(uiState: SeaAnalysisDetailUiState) {
             .clip(RoundedCornerShape(16.dp))
             .background(GraphBackground)
     ) {
-        Column(
-            modifier = Modifier
-                .padding(horizontal = 20.dp)
-                .padding(top = 24.dp, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                text = "최근 7일 수온 변화",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            Text(
-                text = "일별 수온 추이 분석",
-                fontSize = 14.sp,
-                color = Color.White.copy(alpha = 0.7f)
-            )
-        }
+        Column {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 24.dp, bottom = 16.dp),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "최근 7일 수온 변화",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = selectedScale.subtitle,
+                        fontSize = 14.sp,
+                        color = Color.White.copy(alpha = 0.7f)
+                    )
+                }
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(280.dp)
-                .padding(horizontal = 10.dp)
-                .padding(bottom = 16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            if (uiState.isLoading) {
-                CircularProgressIndicator(color = Color.White.copy(alpha = 0.7f))
-            } else {
-                TemperatureLineGraph(
-                    dataSets = graphDataSets,
-                    dates = uiState.graphDates,
-                    modifier = Modifier.fillMaxSize()
+                TemperatureGraphScaleMenu(
+                    selectedScale = selectedScale,
+                    onScaleSelected = { selectedScale = it }
                 )
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(280.dp)
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(color = Color.White.copy(alpha = 0.7f))
+                } else {
+                    TemperatureLineGraph(
+                        dataSets = graphDataSets,
+                        dates = uiState.graphDates,
+                        scale = selectedScale,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
     }
@@ -329,6 +353,82 @@ data class GraphDataSet(
     val color: Color
 )
 
+private enum class TemperatureGraphScale(
+    val menuLabel: String,
+    val subtitle: String,
+    val intervalHours: Int?
+) {
+    DATE("날짜별", "일별 수온 추이 분석", null),
+    HOURS_12("12시간", "12시간 단위 수온 추이 분석", 12),
+    HOURS_6("6시간", "6시간 단위 수온 추이 분석", 6),
+    HOURS_3("3시간", "3시간 단위 수온 추이 분석", 3);
+
+    val isScrollable: Boolean
+        get() = intervalHours != null
+}
+
+private data class ChartTick(
+    val position: Float,
+    val label: String
+)
+
+@Composable
+private fun TemperatureGraphScaleMenu(
+    selectedScale: TemperatureGraphScale,
+    onScaleSelected: (TemperatureGraphScale) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color.White.copy(alpha = 0.14f))
+                .clickable { expanded = true }
+                .padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = selectedScale.menuLabel,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            Icon(
+                imageVector = Icons.Filled.KeyboardArrowDown,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.width(116.dp)
+        ) {
+            TemperatureGraphScale.entries.forEach { option ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = option.menuLabel,
+                            fontSize = 14.sp,
+                            fontWeight = if (option == selectedScale) FontWeight.Bold else FontWeight.Normal,
+                            color = Color.Black
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onScaleSelected(option)
+                    },
+                    modifier = Modifier.height(40.dp)
+                )
+            }
+        }
+    }
+}
+
 /**
  * Compose Canvas로 구현한 꺾은선 그래프.
  *
@@ -340,6 +440,7 @@ data class GraphDataSet(
 private fun TemperatureLineGraph(
     dataSets: List<GraphDataSet>,
     dates: List<String>,
+    scale: TemperatureGraphScale,
     modifier: Modifier = Modifier
 ) {
     val allValues = dataSets.flatMap { it.values }
@@ -361,88 +462,219 @@ private fun TemperatureLineGraph(
     val tempRange = (maxTemp - minTemp).coerceAtLeast(0.1f)
 
     val textMeasurer = rememberTextMeasurer()
+    val horizontalScrollState = rememberScrollState()
+    val pointCount = dataSets.maxOfOrNull { it.values.size } ?: 0
+    val ticks = remember(scale, dates, pointCount) {
+        buildChartTicks(scale = scale, dates = dates, pointCount = pointCount)
+    }
     val labelStyle = TextStyle(
         fontSize = 10.sp,
+        lineHeight = 12.sp,
         color = Color.White.copy(alpha = 0.7f)
     )
 
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val topPad    = 2f * density
-        val bottomPad = 36f * density
-        val leftPad   = 30f * density
-        val graphH = h - topPad - bottomPad
-        val graphW = w - leftPad
+    LaunchedEffect(scale) {
+        horizontalScrollState.scrollTo(0)
+    }
 
-        // ── 가로 가이드라인 5개 + Y축 레이블 ─────────────────────────────────
-        for (i in 0..4) {
-            val ratio = i / 4f
-            val y = (h - bottomPad) - (ratio * graphH)
-            drawLine(
-                color = Color.White.copy(alpha = 0.3f),
-                start = Offset(leftPad, y),
-                end = Offset(w, y),
-                strokeWidth = 0.5f * density
-            )
-            val tempLabel = String.format("%.1f", minTemp + tempRange * ratio)
-            val measured = textMeasurer.measure(tempLabel, style = labelStyle)
-            drawText(
-                textLayoutResult = measured,
-                topLeft = Offset(0f, y - measured.size.height / 2f)
-            )
-        }
+    Row(modifier = modifier) {
+        Canvas(
+            modifier = Modifier
+                .width(32.dp)
+                .fillMaxHeight()
+        ) {
+            val h = size.height
+            val topPad = 20f * density
+            val bottomPad = 42f * density
+            val graphH = h - topPad - bottomPad
 
-        // ── 세로 가이드라인 (0..dates.size) + X축 날짜 레이블 ─────────────────
-        if (dates.isNotEmpty()) {
-            val gridXStep = graphW / dates.size.toFloat()
-            for (i in 0..dates.size) {
-                val x = leftPad + i * gridXStep
-                drawLine(
-                    color = Color.White.copy(alpha = 0.1f),
-                    start = Offset(x, topPad),
-                    end = Offset(x, h - bottomPad),
-                    strokeWidth = 0.5f * density
-                )
-            }
-            val labelY = h - bottomPad + 8f * density
-            dates.forEachIndexed { i, date ->
-                val x = leftPad + i * gridXStep
-                val measured = textMeasurer.measure(date, style = labelStyle)
+            for (i in 0..4) {
+                val ratio = i / 4f
+                val y = (h - bottomPad) - (ratio * graphH)
+                val tempLabel = String.format("%.1f", minTemp + tempRange * ratio)
+                val measured = textMeasurer.measure(tempLabel, style = labelStyle)
                 drawText(
                     textLayoutResult = measured,
-                    topLeft = Offset(x - measured.size.width / 2f, labelY)
+                    topLeft = Offset(
+                        x = 4f * density,
+                        y = y - measured.size.height / 2f
+                    )
                 )
             }
         }
 
-        // ── 데이터 꺾은선 ────────────────────────────────────────────────────
-        dataSets.forEach { dataSet ->
-            if (dataSet.values.size < 2) return@forEach
-            val lineXStep = graphW / (dataSet.values.size - 1).toFloat()
-            val path = Path()
-            var pathStarted = false
+        BoxWithConstraints(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+        ) {
+            val plotWidth = graphPlotWidth(
+                scale = scale,
+                pointCount = pointCount,
+                availableWidth = maxWidth
+            )
+            val scrollModifier = if (scale.isScrollable) {
+                Modifier.horizontalScroll(horizontalScrollState)
+            } else {
+                Modifier
+            }
 
-            dataSet.values.forEachIndexed { index, value ->
-                val x = leftPad + index * lineXStep
-                if (value > 0f) {
-                    val ratio = (value - minTemp) / tempRange
-                    val y = (h - bottomPad) - (ratio * graphH)
-                    if (!pathStarted) { path.moveTo(x, y); pathStarted = true }
-                    else path.lineTo(x, y)
-                } else {
-                    if (pathStarted) {
-                        drawPath(path = path, color = dataSet.color,
-                            style = Stroke(width = 2f * density, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                        path.reset()
-                        pathStarted = false
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(scrollModifier)
+            ) {
+                Canvas(
+                    modifier = Modifier
+                        .width(plotWidth)
+                        .fillMaxHeight()
+                ) {
+                    val w = size.width
+                    val h = size.height
+                    val topPad = 20f * density
+                    val bottomPad = 42f * density
+                    val graphH = h - topPad - bottomPad
+                    val graphW = w
+
+                    // ── 가로 가이드라인 ──────────────────────────────────────
+                    for (i in 0..4) {
+                        val ratio = i / 4f
+                        val y = (h - bottomPad) - (ratio * graphH)
+                        drawLine(
+                            color = Color.White.copy(alpha = 0.3f),
+                            start = Offset(0f, y),
+                            end = Offset(w, y),
+                            strokeWidth = 0.5f * density
+                        )
+                    }
+
+                    // ── 세로 가이드라인 + X축 라벨 ───────────────────────────
+                    val labelY = h - bottomPad + 8f * density
+                    ticks.forEach { tick ->
+                        val x = tick.position * graphW
+                        drawLine(
+                            color = Color.White.copy(alpha = 0.12f),
+                            start = Offset(x, topPad),
+                            end = Offset(x, h - bottomPad),
+                            strokeWidth = 0.5f * density
+                        )
+
+                        val measured = textMeasurer.measure(tick.label, style = labelStyle)
+                        val maxLabelX = (w - measured.size.width).coerceAtLeast(0f)
+                        val labelX = (x - measured.size.width / 2f).coerceIn(0f, maxLabelX)
+                        drawText(
+                            textLayoutResult = measured,
+                            topLeft = Offset(labelX, labelY)
+                        )
+                    }
+
+                    // ── 데이터 꺾은선 ────────────────────────────────────────
+                    dataSets.forEach { dataSet ->
+                        if (dataSet.values.size < 2) return@forEach
+                        val lineXStep = graphW / (dataSet.values.size - 1).toFloat()
+                        val path = Path()
+                        var pathStarted = false
+
+                        dataSet.values.forEachIndexed { index, value ->
+                            val x = index * lineXStep
+                            if (value > 0f) {
+                                val ratio = (value - minTemp) / tempRange
+                                val y = (h - bottomPad) - (ratio * graphH)
+                                if (!pathStarted) {
+                                    path.moveTo(x, y)
+                                    pathStarted = true
+                                } else {
+                                    path.lineTo(x, y)
+                                }
+                            } else {
+                                if (pathStarted) {
+                                    drawPath(
+                                        path = path,
+                                        color = dataSet.color,
+                                        style = Stroke(
+                                            width = 2f * density,
+                                            cap = StrokeCap.Round,
+                                            join = StrokeJoin.Round
+                                        )
+                                    )
+                                    path.reset()
+                                    pathStarted = false
+                                }
+                            }
+                        }
+                        if (pathStarted) {
+                            drawPath(
+                                path = path,
+                                color = dataSet.color,
+                                style = Stroke(
+                                    width = 2f * density,
+                                    cap = StrokeCap.Round,
+                                    join = StrokeJoin.Round
+                                )
+                            )
+                        }
                     }
                 }
             }
-            if (pathStarted) {
-                drawPath(path = path, color = dataSet.color,
-                    style = Stroke(width = 2f * density, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}
+
+private fun graphPlotWidth(
+    scale: TemperatureGraphScale,
+    pointCount: Int,
+    availableWidth: Dp
+): Dp {
+    if (!scale.isScrollable || pointCount <= 1) return availableWidth
+
+    val pointSpacing = when (scale) {
+        TemperatureGraphScale.HOURS_12 -> 2.65f.dp
+        TemperatureGraphScale.HOURS_6 -> 5.3f.dp
+        TemperatureGraphScale.HOURS_3 -> 9.dp
+        TemperatureGraphScale.DATE -> 0.dp
+    }
+    val width = (pointSpacing.value * (pointCount - 1)).dp
+    return if (width < availableWidth) availableWidth else width
+}
+
+private fun buildChartTicks(
+    scale: TemperatureGraphScale,
+    dates: List<String>,
+    pointCount: Int
+): List<ChartTick> {
+    if (pointCount <= 1) return emptyList()
+
+    if (scale == TemperatureGraphScale.DATE) {
+        if (dates.isEmpty()) return emptyList()
+        return dates.mapIndexed { index, date ->
+            ChartTick(
+                position = if (dates.size == 1) 0f else index / (dates.size - 1).toFloat(),
+                label = date
+            )
+        }
+    }
+
+    val intervalHours = scale.intervalHours ?: return emptyList()
+    val step = intervalHours * 2
+    return buildList {
+        var index = 0
+        while (index < pointCount) {
+            val dayOffset = index / 48
+            if (dayOffset in dates.indices) {
+                val hour = (index % 48) / 2
+                val label = if (hour == 0) {
+                    "${dates[dayOffset]}\n00시"
+                } else {
+                    String.format("%02d시", hour)
+                }
+                add(
+                    ChartTick(
+                        position = index / (pointCount - 1).toFloat(),
+                        label = label
+                    )
+                )
             }
+            index += step
         }
     }
 }

@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "548828050984",
+    "project_id": "seathermo-ffca6",
+    "storage_bucket": "seathermo-ffca6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:548828050984:android:aa4bf58ee217987384e71d",
+        "android_client_info": {
+          "package_name": "com.onbada.seathermo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCo69fc7zo8s07jGNvMu2NOoDjMdW7u2tg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:548828050984:android:6a8b6f8c2b19973b84e71d",
+        "android_client_info": {
+          "package_name": "com.onbada.seathermo.internal"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCo69fc7zo8s07jGNvMu2NOoDjMdW7u2tg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

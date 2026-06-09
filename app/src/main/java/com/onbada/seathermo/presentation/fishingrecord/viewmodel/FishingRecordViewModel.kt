@@ -95,6 +95,8 @@ class FishingRecordViewModel(
 
         val currentLocation = mapLine.currentLocation
         val prevLocation = mapLine.previousLocation
+        val isCurrentLocationValid = currentLocation.latitude != 0.0 || currentLocation.longitude != 0.0
+        val isPreviousLocationValid = prevLocation.latitude != 0.0 || prevLocation.longitude != 0.0
 
         // 1. 속도 업데이트 (m/s -> knots)
         val speedMps = if (currentLocation.hasSpeed()) currentLocation.speed else 0f
@@ -165,7 +167,13 @@ class FishingRecordViewModel(
             currentSpeed = speedKnots.toDouble(),
             fishingState = confirmedState,
             distance = it.distance + distanceDelta,
-            currentLocation = currentLocation
+            currentLocation = currentLocation,
+            startLocation = it.startLocation ?: when {
+                isPreviousLocationValid -> prevLocation
+                isCurrentLocationValid -> currentLocation
+                else -> null
+            },
+            endLocation = if (isCurrentLocationValid) currentLocation else it.endLocation
         )}
 
         // 7. 경로선 이벤트 발행 (지도 드로잉용 SharedFlow).
@@ -194,7 +202,9 @@ class FishingRecordViewModel(
             photoMarkers = emptyList(),
             distance = 0.0,
             duration = 0,
-            savedPointCount = 1 // 시작 지점 포함
+            savedPointCount = 1, // 시작 지점 포함
+            startLocation = null,
+            endLocation = null
         )}
 
         // 전역 AppManager에 기록 시작 상태를 알립니다.
@@ -222,13 +232,16 @@ class FishingRecordViewModel(
     fun stopRecording() {
         // 종료 지점 저장 — 유효한 GPS 좌표인 경우에만 저장합니다.
         val loc = _uiState.value.currentLocation ?: locationManager.currentMapLine.value.currentLocation
-        if (loc.latitude != 0.0 || loc.longitude != 0.0) {
+        val isStopLocationValid = loc.latitude != 0.0 || loc.longitude != 0.0
+        if (isStopLocationValid) {
             useCase.savePoint(currentSessionId, loc.latitude, loc.longitude, 0.0, _uiState.value.fishingState.value)
         }
 
         _uiState.update { it.copy(
             isRecording = false,
-            isStopPopupPresented = false
+            isStopPopupPresented = false,
+            startLocation = null,
+            endLocation = null
         )}
 
         // 기록 종료 시 AppManager 상태도 해제합니다.
@@ -390,6 +403,8 @@ data class FishingRecordUiState(
     val distance: Double = 0.0,
     val duration: Long = 0,
     val currentLocation: Location? = null,
+    val startLocation: Location? = null,
+    val endLocation: Location? = null,
     val markers: List<StateChangeMarker> = emptyList(),
     val photoMarkers: List<PhotoMarker> = emptyList(),
     val savedImagePaths: List<String> = emptyList(),

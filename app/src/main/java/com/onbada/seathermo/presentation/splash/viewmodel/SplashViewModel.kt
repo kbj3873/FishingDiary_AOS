@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.onbada.seathermo.BuildConfig
 import com.onbada.seathermo.common.utils.AppPreferences
 import com.onbada.seathermo.common.utils.PreferenceConstants
 import com.onbada.seathermo.domain.usecase.SplashUseCase
@@ -72,14 +73,17 @@ class SplashViewModel(
                 val versionResultDeferred = async { splashUseCase.checkVersion(appVersion = currentVersion) }
                 val delayDeferred = async { delay(minimumDisplayDuration) }
 
-                // 관측소 목록은 버전 체크와 독립적으로 저장 (버전 체크 실패 시에도 캐싱)
-                try {
-                    val regions = splashUseCase.fetchRegions()
-                    // ALL_REGION_LIST: CrawlingOceanSelectScreen의 전체 지역 목록 선택용
-                    AppPreferences.setToList(context, regions, PreferenceConstants.ALL_REGION_LIST)
-                    println("[Splash] 관측소 목록 캐싱 완료: ${regions.size}개")
-                } catch (e: Exception) {
-                    println("[Splash] 관측소 목록 fetch 실패: ${e.message}")
+                if (BuildConfig.INTERNAL_BUILD) {
+                    // 관측소 목록은 internal 기능(크롤링 현재수온/수온분석)에서만 사용합니다.
+                    // public 빌드는 seathermo.com/api/regions 호출을 하지 않습니다.
+                    try {
+                        val regions = splashUseCase.fetchRegions()
+                        // ALL_REGION_LIST: CrawlingOceanSelectScreen의 전체 지역 목록 선택용
+                        AppPreferences.setToList(context, regions, PreferenceConstants.ALL_REGION_LIST)
+                        println("[Splash] 관측소 목록 캐싱 완료: ${regions.size}개")
+                    } catch (e: Exception) {
+                        println("[Splash] 관측소 목록 fetch 실패: ${e.message}")
+                    }
                 }
 
                 try {

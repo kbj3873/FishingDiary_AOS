@@ -59,6 +59,7 @@ class FishingRecordViewModel(
     // 비동기 작업 관리용 (타이머 등)
     private var timerJob: Job? = null
     private var locationSubscriptionJob: Job? = null
+    private var hasDismissedFishingRecordGuidePopupInSession = false
 
     // 이전 확정 상태 추적
     private var lastFishingState: FDAppManager.FishingState? = null
@@ -318,6 +319,52 @@ class FishingRecordViewModel(
         _uiState.update { it.copy(isStopPopupPresented = true) }
     }
 
+    fun showFishingRecordGuidePopupIfNeeded() {
+        if (hasDismissedFishingRecordGuidePopupInSession) return
+
+        val shouldHide = AppPreferences.getBoolean(
+            getApplication(),
+            PreferenceConstants.HIDE_FISHING_RECORD_GUIDE_POPUP
+        )
+        if (shouldHide) {
+            hasDismissedFishingRecordGuidePopupInSession = true
+            _uiState.update {
+                it.copy(
+                    isFishingRecordGuidePopupPresented = false,
+                    shouldHideFishingRecordGuidePopup = false
+                )
+            }
+        } else {
+            _uiState.update {
+                it.copy(
+                    isFishingRecordGuidePopupPresented = true,
+                    shouldHideFishingRecordGuidePopup = false
+                )
+            }
+        }
+    }
+
+    fun setShouldHideFishingRecordGuidePopup(checked: Boolean) {
+        _uiState.update { it.copy(shouldHideFishingRecordGuidePopup = checked) }
+    }
+
+    fun confirmFishingRecordGuidePopup() {
+        if (_uiState.value.shouldHideFishingRecordGuidePopup) {
+            AppPreferences.setBoolean(
+                getApplication(),
+                PreferenceConstants.HIDE_FISHING_RECORD_GUIDE_POPUP,
+                true
+            )
+        }
+        hasDismissedFishingRecordGuidePopupInSession = true
+        _uiState.update {
+            it.copy(
+                isFishingRecordGuidePopupPresented = false,
+                shouldHideFishingRecordGuidePopup = false
+            )
+        }
+    }
+
     // 기록 시작 버튼 클릭 시 위치 수집 목적을 안내합니다.
     // [개념] Google Play 정책상 위치 정보 수집 전 명확한 고지가 필요합니다.
     //        최초 1회만 팝업을 표시하며, 이후에는 바로 기록 시작 흐름으로 진입합니다.
@@ -409,6 +456,8 @@ data class FishingRecordUiState(
     val photoMarkers: List<PhotoMarker> = emptyList(),
     val savedImagePaths: List<String> = emptyList(),
     val savedPointCount: Int = 0,
+    val isFishingRecordGuidePopupPresented: Boolean = false,
+    val shouldHideFishingRecordGuidePopup: Boolean = false,
     val isStopPopupPresented: Boolean = false,
     // 기록 시작 전 위치 수집 목적 안내 팝업 (Google Play 정책 대응, 최초 1회)
     val isLocationDisclosurePopupPresented: Boolean = false,

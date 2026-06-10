@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
@@ -50,6 +51,7 @@ private val PopupBackground = Color(0xF2FFFFFF)      // white opacity 0.95
 private val PopupDividerColor = Color(0x1A000000)    // black opacity 0.1
 private val PopupTitleColor = Color.Black
 private val PopupMessageColor = Color(0xFF8E8E93)    // System Gray
+private val PopupOptionColor = Color(0xFF6B7280)     // Gray-500
 private val PopupPrimaryDefault = Color(0xFF2563EB)  // Blue
 val PopupDestructiveColor = Color(0xFFFF3B30)        // Red (외부 사용 가능)
 private val DimBackground = Color(0x66000000)        // black opacity 0.4
@@ -92,6 +94,9 @@ private val DimBackground = Color(0x66000000)        // black opacity 0.4
  * @param onPrimaryClick 주 버튼 클릭 콜백
  * @param secondaryButtonText 보조 버튼 텍스트 (null이면 단일 버튼 스타일)
  * @param onSecondaryClick 보조 버튼 클릭 콜백
+ * @param checkboxText 체크박스 라벨 (null이면 체크박스 미노출)
+ * @param checkboxChecked 체크박스 선택 여부
+ * @param onCheckboxCheckedChange 체크박스 선택 변경 콜백
  * @param onDismiss 팝업 바깥 탭 또는 뒤로가기 시 콜백 (기본: primaryAction과 동일)
  */
 @Composable
@@ -105,6 +110,9 @@ fun CommonPopupView(
     onPrimaryClick: () -> Unit,
     secondaryButtonText: String? = null,
     onSecondaryClick: (() -> Unit)? = null,
+    checkboxText: String? = null,
+    checkboxChecked: Boolean = false,
+    onCheckboxCheckedChange: ((Boolean) -> Unit)? = null,
     onDismiss: () -> Unit = onPrimaryClick
 ) {
     // [개념] Dialog()는 시스템 레벨 오버레이 레이어를 생성합니다.
@@ -139,7 +147,13 @@ fun CommonPopupView(
         ) {
             Column {
                 // ── 1. 콘텐츠 영역 (제목 + 메시지) ──────────────────────────
-                ContentArea(title = title, message = message)
+                ContentArea(
+                    title = title,
+                    message = message,
+                    checkboxText = checkboxText,
+                    checkboxChecked = checkboxChecked,
+                    onCheckboxCheckedChange = onCheckboxCheckedChange
+                )
 
                 // ── 2. 버튼 영역 ──────────────────────────────────────────────
                 when (layoutType) {
@@ -170,11 +184,20 @@ fun CommonPopupView(
 // ── 콘텐츠 영역 ──────────────────────────────────────────────────────────────
 
 @Composable
-private fun ContentArea(title: String, message: String) {
+private fun ContentArea(
+    title: String,
+    message: String,
+    checkboxText: String?,
+    checkboxChecked: Boolean,
+    onCheckboxCheckedChange: ((Boolean) -> Unit)?
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 24.dp, bottom = 24.dp),
+            .padding(
+                top = 24.dp,
+                bottom = if (checkboxText == null) 24.dp else 16.dp
+            ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // 제목 — iOS: 17sp, SemiBold, Black
@@ -196,6 +219,31 @@ private fun ContentArea(title: String, message: String) {
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
+
+        if (checkboxText != null && onCheckboxCheckedChange != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, top = 8.dp, end = 24.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { onCheckboxCheckedChange(!checkboxChecked) }
+                    ),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = checkboxChecked,
+                    onCheckedChange = onCheckboxCheckedChange
+                )
+                Text(
+                    text = checkboxText,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = PopupOptionColor
+                )
+            }
+        }
     }
 }
 
@@ -349,6 +397,9 @@ fun CommonPopupOverlay(
     onPrimaryClick: () -> Unit,
     secondaryButtonText: String? = null,
     onSecondaryClick: (() -> Unit)? = null,
+    checkboxText: String? = null,
+    checkboxChecked: Boolean = false,
+    onCheckboxCheckedChange: ((Boolean) -> Unit)? = null,
     onDismiss: () -> Unit = onPrimaryClick
 ) {
     Box(
@@ -380,6 +431,9 @@ fun CommonPopupOverlay(
                 onPrimaryClick = onPrimaryClick,
                 secondaryButtonText = secondaryButtonText,
                 onSecondaryClick = onSecondaryClick,
+                checkboxText = checkboxText,
+                checkboxChecked = checkboxChecked,
+                onCheckboxCheckedChange = onCheckboxCheckedChange,
                 onDismiss = onDismiss
             )
         }

@@ -296,6 +296,14 @@ fun FishingRecordScreen(
         }
     }
 
+    // 낚시기록 탭이 보이는 첫 순간에 안내 팝업을 표시합니다.
+    // 확인은 현재 앱 실행 동안만 숨김 처리하고, "다시 보지 않기"만 영구 저장합니다.
+    LaunchedEffect(isVisible) {
+        if (isVisible) {
+            viewModel.showFishingRecordGuidePopupIfNeeded()
+        }
+    }
+
     // 초기 카메라 이동: 지도가 준비되거나 위치 권한이 허용되는 순간 실행합니다.
     //
     // [개념] key가 2개(googleMap, locationPermissionGranted)이므로 둘 중 하나가 바뀌면 재실행됩니다.
@@ -1008,7 +1016,22 @@ fun FishingRecordScreen(
             )
         }
 
-        // ── 3. 팝업: 기록 중단 확인 ──────────────────────────────────────────
+        // ── 3. 팝업: 낚시 기록 안내 ──────────────────────────────────────────
+        if (uiState.isFishingRecordGuidePopupPresented) {
+            CommonPopupOverlay(
+                title = "낚시 기록 안내",
+                message = "워킹 루어 낚시나 보트 낚시처럼 이동 경로가 중요한 낚시에 적합한 기능입니다.\n\n기록 중 이동 경로가 저장되고, 이동 중 낚시중 또는 탐색중으로 전환한 지점은 마커로 표시됩니다.\n\n사진을 촬영해 조과 포인트를 함께 남길 수 있고, 저장된 기록은 히스토리에서 다시 확인할 수 있어요.",
+                layoutType = PopupLayoutType.Vertical,
+                primaryButtonText = "확인",
+                onPrimaryClick = { viewModel.confirmFishingRecordGuidePopup() },
+                checkboxText = "다시 보지 않기",
+                checkboxChecked = uiState.shouldHideFishingRecordGuidePopup,
+                onCheckboxCheckedChange = { viewModel.setShouldHideFishingRecordGuidePopup(it) },
+                onDismiss = { viewModel.confirmFishingRecordGuidePopup() }
+            )
+        }
+
+        // ── 4. 팝업: 기록 중단 확인 ──────────────────────────────────────────
         // [개념] CommonPopupOverlay는 딤 배경 + 팝업 카드를 한 번에 처리합니다.
         //        iOS의 CommonPopupView(layoutType: .horizontal)에 대응합니다.
         if (uiState.isStopPopupPresented) {
@@ -1024,7 +1047,7 @@ fun FishingRecordScreen(
             )
         }
 
-        // ── 4. 팝업: 위치 권한 설명 (1차 거부 → 재요청) ─────────────────────
+        // ── 5. 팝업: 위치 권한 설명 (1차 거부 → 재요청) ─────────────────────
         // [개념] shouldShowRequestPermissionRationale == true일 때 표시합니다.
         //        왜 권한이 필요한지 설명하고 사용자에게 재요청 기회를 제공합니다.
         //        "허용하기"를 누르면 시스템 권한 다이얼로그를 다시 띄웁니다.
@@ -1049,7 +1072,7 @@ fun FishingRecordScreen(
             )
         }
 
-        // ── 5. 팝업: 위치 권한 안내 (영구 거부 → 설정) ──────────────────────
+        // ── 6. 팝업: 위치 권한 안내 (영구 거부 → 설정) ──────────────────────
         // [개념] shouldShowRequestPermissionRationale == false(영구 거부)일 때 표시합니다.
         //        앱에서 더 이상 권한 요청이 불가하므로 시스템 설정으로 안내합니다.
         //        iOS의 openURL(prefs:root=)에 대응합니다.
@@ -1069,7 +1092,7 @@ fun FishingRecordScreen(
             )
         }
 
-        // ── 6. 팝업: 카메라 권한 설명 (1차 거부 → 재요청) ───────────────────
+        // ── 7. 팝업: 카메라 권한 설명 (1차 거부 → 재요청) ───────────────────
         if (uiState.isCameraRationalePopupPresented) {
             CommonPopupOverlay(
                 title = "카메라 권한이 필요합니다",
@@ -1086,7 +1109,7 @@ fun FishingRecordScreen(
             )
         }
 
-        // ── 7. 팝업: 카메라 권한 안내 (영구 거부 → 설정) ────────────────────
+        // ── 8. 팝업: 카메라 권한 안내 (영구 거부 → 설정) ────────────────────
         if (uiState.isCameraPermissionPopupPresented) {
             CommonPopupOverlay(
                 title = "카메라 권한 필요",
@@ -1103,7 +1126,7 @@ fun FishingRecordScreen(
             )
         }
 
-        // ── 8. 팝업: 위치 정보 수집 안내 (기록 시작 전 in-app disclosure, 최초 1회) ─
+        // ── 9. 팝업: 위치 정보 수집 안내 (기록 시작 전 in-app disclosure, 최초 1회) ─
         // [개념] Google Play 정책은 위치 데이터 수집 전 수집 목적을 명시적으로 고지하도록 요구합니다.
         //        "동의하고 시작" 탭 시 confirmLocationDisclosure()가 동의 여부를 SharedPreferences에 저장합니다.
         //        이후 실행부터는 팝업 없이 shouldProceedToRecording 플래그로 바로 기록 시작 흐름에 진입합니다.

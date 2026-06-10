@@ -210,4 +210,10 @@ object PreferenceConstants {
      * Whether the user has confirmed the location data collection disclosure
      */
     const val HAS_SEEN_LOCATION_DISCLOSURE = "hasSeenLocationDisclosure"
+
+    /**
+     * 낚시 기록 안내 팝업 다시 보지 않기 여부
+     * Whether the fishing record guide popup should be hidden permanently
+     */
+    const val HIDE_FISHING_RECORD_GUIDE_POPUP = "hideFishingRecordGuidePopup"
 }

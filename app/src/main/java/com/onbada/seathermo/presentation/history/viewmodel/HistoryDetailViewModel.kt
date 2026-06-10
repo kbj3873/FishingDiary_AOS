@@ -172,7 +172,7 @@ class HistoryDetailViewModel(
             endMarker = endpointMarkerFor(
                 record = last,
                 id = "history_end_marker",
-                title = "낚시종료",
+                title = "낚시 종료",
                 timeString = timeSdf.format(Date(last.date))
             ),
             centerLatitude = first.location.latitude,
